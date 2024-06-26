@@ -40,11 +40,10 @@ export default async function () {
     const withoutParentheses = input.replace(/\(.*?\)/g, '');
     const withoutDoubleSlashes = withoutParentheses.replace(/\/\//g, '/');
     const dotNotation = withoutDoubleSlashes.split('/').map(part => {
-      return part.split(/[^a-zA-Z0-9]/).map((word, index) => {
+      return part.split(/[^a-zA-Z0-9-]/).map((word, index) => {
         return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
       }).join('');
     }).join('.');
-
     // remove any trailing dots
     return dotNotation.replace(/\.$/, '');
   }
@@ -76,13 +75,15 @@ export default async function () {
   function convertToCamelCase(input: string): string {
     const withoutParentheses = input.replace(/\(.*?\)/g, '');
     const withoutDoubleSlashes = withoutParentheses.replace(/\/\//g, '/');
-    return withoutDoubleSlashes.split(/[^a-zA-Z0-9]/).map((word, index) => {
+    let variableName = withoutDoubleSlashes.split(/[^a-zA-Z0-9-]/).map((word, index) => {
       if (index === 0) {
         return word.toLowerCase();
       } else {
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
       }
     }).join('');
+
+    return variableName;
   }
 
   function convertToCSSVariableName(input: string): string {
@@ -90,11 +91,10 @@ export default async function () {
     // replace any double slashes with a single slash `/`
     const withoutDoubleSlashes = withoutParentheses.replace(/\/\//g, '/');
     const variableName = "--" + withoutDoubleSlashes.split('/').map(part => {
-      return part.split(/[^a-zA-Z0-9]/).map((word, index) => {
+      return part.split(/[^a-zA-Z0-9-]/).map((word, index) => {
         return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
       }).join('');
     }).join('-');
-
     // remove any trailing hyphens
     return variableName.replace(/-+$/, '');
   }
@@ -123,7 +123,6 @@ export default async function () {
     const variable = await figma.variables.getVariableByIdAsync(variableId);
     const collectionId = variable?.variableCollectionId;
     const collection = collectionId ? await figma.variables.getVariableCollectionByIdAsync(collectionId) : null;
-    const modeId = collection ? collection.defaultModeId : null;
     // get the name of the variable
     // console.log("getTokenNameByIdAsync - variable?.name : ", variable?.name);
     return variable?.name;
