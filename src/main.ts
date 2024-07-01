@@ -426,6 +426,8 @@ export default async function () {
     }
   }
 
+
+  // TODO: delete this by keeping the object as a JSON.
   function convertToNestedObject(input: string): any {
     if (typeof input !== 'string') {
       throw new Error('Input must be a string');
@@ -473,13 +475,9 @@ export default async function () {
   on<CopyVariablesHandler>(
     'COPY_VARIABLES',
     function (collection: any, mode: any, exportFormat: string, valueFormat: string): void {
-      //console.log(`maint.ts - COPY_VARIABLES - collection, mode: `, collection, mode, exportFormat, valueFormat);
       exportedTokens = {}
       let tokensToExport;
-      if (collection === undefined && mode === undefined) {
-        tokensToExport = figma.variables.getLocalVariables(); // get ALL local variables
-        // console.log(`Processing ${tokensToExport.length} tokens...`)
-      } else if (collection !== undefined && mode !== undefined) {
+      if (!!collection && !!mode) {
         const variableCollection = figma.variables.getVariableCollectionById(collection.id);
         if (variableCollection) {
           tokensToExport = variableCollection.variableIds.map((variableId) => {
@@ -507,20 +505,48 @@ export default async function () {
 
           // console.log(`Exported ${Object.keys(exportedTokens).length} of ${tokensToExport.length} tokens.`)
         }
+      } else {
+        figma.notify("Please select a collection and mode to export.");
       }
+
       let formattedExportedTokens = JSON.stringify(exportedTokens);
       if (exportFormat === "cssVar" || exportFormat === "camelCase") {
         formattedExportedTokens = ":root " + formattedExportedTokens;
       }
-      formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\":/g, "$1: ").replace(/\"([^(\")"]+)\"/g, "'$1'").replace(/,/g, ";\n  ").replace(/{/g, "{\n  ").replace(/}/g, ";\n}");
-      // console.log(formattedExportedTokens)
+      formattedExportedTokens = formatCSSFromJSON(formattedExportedTokens);
+
+      // TODO: delete this by keeping the object as a JSON.
       if (exportFormat === "dotNotation") {
         formattedExportedTokens = convertToNestedObject(formattedExportedTokens);
         // modify the text formatting of `formattedExportedTokens` to have the proper indentation and new lines of a nested JSON object so that it is readable
-
       }
       emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedExportedTokens)
     }
   )
+
+  function formatCSSFromJSON(json: any): string {
+    // Initialize formattedExportedTokens with some JSON-like string
+    let formattedExportedTokens = "...";
+
+    // Replace quoted keys in JSON (excluding the colon) with unquoted keys
+    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\":/g, "$1: ");
+
+    // Replace double quotes around values with single quotes
+    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\"/g, "'$1'");
+
+    // Replace commas with a semicolon and a newline, adding two spaces for indentation
+    formattedExportedTokens = formattedExportedTokens.replace(/,/g, ";\n  ");
+
+    // Add a newline and two spaces after every opening brace for better readability
+    formattedExportedTokens = formattedExportedTokens.replace(/{/g, "{\n  ");
+
+    // Add a semicolon, newline, and closing brace to close scopes neatly
+    formattedExportedTokens = formattedExportedTokens.replace(/}/g, ";\n}");
+
+    return formattedExportedTokens;
+  }  
+
 }
+
+
 
