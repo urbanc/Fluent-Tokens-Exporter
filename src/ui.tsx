@@ -21,14 +21,10 @@ function Plugin() {
   const [localVariableCollections, setLocalVariableCollections]: [VariableCollection[], Function] = useState<VariableCollection[]>([])
   const [collectionOptions, setCollectionOptions]: [DropdownOption[], Function] = useState<DropdownOption[]>([{ value: "All variable collections" }, '-']);
   const [modeOptions, setModeOptions]: [DropdownOption[], Function] = useState<DropdownOption[]>([{ value: "All modes" }]);
-  const [formatOptions, setFormatOptions]: [DropdownOption[], Function] = useState<DropdownOption[]>([{ text: "--css-variable-name", value: "cssVar" }, { text: "camelCase", value: "camelCase" }, { text: "JSON", value: "dotNotation" }]);
 
   const [collection, setCollection] = useState<string>("All variable collections");
   const [mode, setMode] = useState<string>("All modes");
   const [exportFormat, setExportFormat] = useState<string>("cssVar");
-  const [selectedCollection, setSelectedCollection] = useState<VariableCollection | null>(null);
-  const [selectedMode, setSelectedMode] = useState<Variable | null>(null);
-
 
   const [valueFormat, setValueFormat] = useState<string>('Raw value');
   const valueFormatOptions: Array<SegmentedControlOption> = [{
@@ -109,7 +105,6 @@ function Plugin() {
   });
 
   on<GetVariablesHandler>('GET_VARIABLES', (localVariableCollections) => {
-    // console.log("ui.tsx - on<GetVariablesHandler>", localVariableCollections)
     setLocalVariableCollections(localVariableCollections)
     let newCollectionOptions: { value: string; }[] = []
     let newModesOptions: Array<{ value: string; } | { header: string; } | string> = [];
@@ -126,10 +121,6 @@ function Plugin() {
   })
 
   function handleCopy(event: JSX.TargetedEvent<HTMLButtonElement>) {
-    // console.log("ui.tsx - handleCopy - collection", collection)
-    // console.log("ui.tsx - handleCopy - mode", mode)
-    //console.log("ui.tsx - handleCopy - exportFormat", exportFormat);
-    //console.log("ui.tsx - handleCopy - valueFormat", valueFormat);
     const selectedCollection = localVariableCollections.find((element) => element.name == collection)
     const selectedMode = selectedCollection?.modes.find((element) => element.name == mode)
     emit<CopyVariablesHandler>('COPY_VARIABLES', selectedCollection, selectedMode, exportFormat, valueFormat)
@@ -200,7 +191,7 @@ function Plugin() {
           <Dropdown icon={IconVariableMode16} onChange={handleModeChange} options={modeOptions} value={mode} />
           <VerticalSpace space='small' />
           <Text><Bold><Muted>Export format</Muted></Bold></Text>
-          <Dropdown onChange={handleExportFormatChange} options={formatOptions} value={exportFormat} />
+          <Dropdown onChange={handleExportFormatChange} options={[{ text: "--css-variable-name", value: "cssVar" }, { text: "camelCase", value: "camelCase" }, { text: "JSON", value: "dotNotation" }]} value={exportFormat} />
           <SegmentedControl onChange={handleValueFormatChange} options={valueFormatOptions} value={valueFormat} />
         </Stack>
       </Container>
