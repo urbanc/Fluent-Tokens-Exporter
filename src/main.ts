@@ -1,5 +1,6 @@
 import { emit, on, showUI } from '@create-figma-plugin/utilities'
 import { formatHex8 } from 'culori'
+import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON } from './utils'
 import { ResizeWindowHandler, GetVariablesHandler, CopyVariablesHandler, CopyToClipboard } from './types'
 
 export default async function () {
@@ -46,109 +47,12 @@ export default async function () {
   let notExportedTokens: string[] = [];
 
 
-  function convertToDotNotation(input: string): string {
-    const withoutParentheses = input.replace(/\(.*?\)/g, '');
-    const withoutDoubleSlashes = withoutParentheses.replace(/\/\//g, '/');
-    const dotNotation = withoutDoubleSlashes.split('/').map(part => {
-      return part.split(/[^a-zA-Z0-9-]/).map((word, index) => {
-        return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      }).join('');
-    }).join('.');
-    // remove any trailing dots
-    return dotNotation.replace(/\.$/, '');
-  }
-
-
-  // create a function based on `https://second-editors-draft.tr.designtokens.org/format/` to convert a string to a nested JSON object in the format of the Design Tokens specification. Example: ```  "token name": {"$value": "token value"}```
-  function convertToNestedJSON(input: string, value: any): any {
-    const withoutParentheses = input.replace(/\(.*?\)/g, '');
-    const withoutDoubleSlashes = withoutParentheses.replace(/\/\//g, '/');
-    const parts = withoutDoubleSlashes.split('/');
-
-    let nestedObject: { [key: string]: any } = {}; // Add index signature to allow indexing with a string
-    let currentLevel = nestedObject;
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      if (i === parts.length - 1) {
-        currentLevel[part] = { "$value": value };
-      } else {
-        currentLevel[part] = {};
-        currentLevel = currentLevel[part];
-      }
-    }
-
-    return nestedObject;
-  }
-
-
-  function convertToCamelCase(input: string): string {
-    const withoutParentheses = input.replace(/\(.*?\)/g, '');
-    const withoutDoubleSlashes = withoutParentheses.replace(/\/\//g, '/');
-    let variableName = withoutDoubleSlashes.split(/[^a-zA-Z0-9-]/).map((word, index) => {
-      if (index === 0) {
-        return word.toLowerCase();
-      } else {
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      }
-    }).join('');
-
-    return variableName;
-  }
-
-  function convertToCSSVariableName(input: string): string {
-    const withoutParentheses = input.replace(/\(.*?\)/g, '');
-    // replace any double slashes with a single slash `/`
-    const withoutDoubleSlashes = withoutParentheses.replace(/\/\//g, '/');
-    const variableName = "--" + withoutDoubleSlashes.split('/').map(part => {
-      return part.split(/[^a-zA-Z0-9-]/).map((word, index) => {
-        return index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      }).join('');
-    }).join('-');
-    // remove any trailing hyphens
-    return variableName.replace(/-+$/, '');
-  }
-
-  function assignNestedProperty(obj: any, path: string, value: any) {
-    const keys = path.split('.');
-    let current = obj;
-
-    while (keys.length > 1) {
-      const key = keys.shift() as string;
-
-      if (current[key] === undefined) {
-        current[key] = {};
-      }
-
-      current = current[key];
-    }
-
-    current[keys[0]] = value;
-  }
-
-
-  // create a function that will asynchronously retrieve the name of the token (not the value of the token) by passing a variableId
-  async function getTokenNameByIdAsync(variableId: string) {
-    // console.log("getTokenNameByIdAsync - variableId: ", variableId);
-    const variable = await figma.variables.getVariableByIdAsync(variableId);
-    const collectionId = variable?.variableCollectionId;
-    const collection = collectionId ? await figma.variables.getVariableCollectionByIdAsync(collectionId) : null;
-    // get the name of the variable
-    // console.log("getTokenNameByIdAsync - variable?.name : ", variable?.name);
-    return variable?.name;
-  }
-
-
-
   // create a counter to keep track of the number of tokens that have been processed
   let tokenCounter = 0;
 
   function exportToken(tokenType: string, tokenValue: any, variableCollection: VariableCollection, token: Variable, exportFormat: string, valueFormat: string): void {
-    // console.log(`maint.ts - exportToken - tokenType, tokenValue, variableCollection, token, exportFormat, valueFormat: `, tokenType, tokenValue, variableCollection, token, exportFormat, valueFormat);
-    //
-    // increment the tokenCounter by 1
     tokenCounter++;
-    // console.log(`ET token ${tokenCounter} ...`, tokenType, tokenValue);
+
     let result;
     try {
       switch (tokenType) {
@@ -290,10 +194,6 @@ export default async function () {
     }
 
     try {
-      // console.log(`maint.ts - adding token: ${token.name}`)
-      // exportedTokens[convertToCamelCase(variableCollection.name + "/" + token.name)] = result;
-      // exportedTokens[convertToCSSVariableName(variableCollection.name + "/" + token.name)] = result;
-
       switch (exportFormat) {
         case "w3c":
           exportedTokens = { ...exportedTokens, ...convertToNestedJSON(token.name, result) };
@@ -309,7 +209,6 @@ export default async function () {
           exportedTokens[convertToCSSVariableName(token.name)] = result;
       }
 
-      // console.log(`${Object.keys(exportedTokens).length} exported tokens`)
     } catch (error) {
 
       console.warn(`Error adding token to exportedTokens: ${token.name}. Error: ${error}`);
@@ -319,28 +218,118 @@ export default async function () {
 
 
   async function getTokenValueByIdAsync(theVarID: string, getRawValue: boolean = true) {
-    // console.log(`getTokenValueByIdAsync(theVarID = ${theVarID}, getRawValue = ${getRawValue}`);
-    // console.log("typeof | isArray theVarID: ", typeof theVarID, Array.isArray(theVarID));
     if (typeof theVarID === "object" && !Array.isArray(theVarID)) {
       theVarID = (theVarID as { id: string }).id;
-      // console.log("theVarID now: ", theVarID);
     }
     const theVar = await figma.variables.getVariableByIdAsync(theVarID);
-    // console.log(`getTokenValueByIdAsync(${theVarID}) - theVar: `, theVar);
     const theCollectionID = theVar?.variableCollectionId;
     const theCollection = theCollectionID ? await figma.variables.getVariableCollectionByIdAsync(theCollectionID) : null;
     const theModeID = theCollection ? theCollection.defaultModeId : null;
     const theVarValue = theVar && theModeID ? theVar.valuesByMode[theModeID] : theVarID;
-    // console.log("getTokenValueByIdAsync - theVarValue: ", theVarValue);
     if (getRawValue && theVarValue && (theVarValue as VariableAlias).type === "VARIABLE_ALIAS") {
-      // recursively call `getTokenValueByIdAsync` until the value is not a variable alias
       return getTokenValueByIdAsync((theVarValue as VariableAlias).id);
     }
-    // console.log("getTokenValueByIdAsync - theVarValue: ", theVarValue);
     return theVarValue;
   }
 
 
+
+
+  // TODO: delete this by keeping the object as a JSON.
+  function convertToNestedObject(input: string): any {
+    if (typeof input !== 'string') {
+      throw new Error('Input must be a string');
+    }
+
+    const lines = input.split('\n');
+    let result = {};
+
+    for (let line of lines) {
+      let [path, value] = line.split(':');
+
+      if (!path || typeof value !== 'string') {
+        continue; // skip this iteration if path is undefined or value is not a string
+      }
+
+      value = value.trim().replace(/'/g, "").replace(/;$/, ""); // remove single quotes and trailing semicolon from the value
+
+      const parts = path.split('.');
+      let currentLevel: { [key: string]: any } = result;
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i].trim();
+
+        if (typeof currentLevel !== 'object') {
+          throw new Error('Expected currentLevel to be an object');
+        }
+
+        if (i === parts.length - 1) {
+          currentLevel[part] = value;
+        } else {
+          if (currentLevel[part] && typeof currentLevel[part] !== 'object') {
+            currentLevel[part] = {}; // overwrite the string value with an object
+          }
+
+          if (!currentLevel[part]) {
+            currentLevel[part] = {};
+          }
+          currentLevel = currentLevel[part];
+        }
+      }
+    }
+
+    return JSON.stringify(result, null, 2);
+  }
+
+  on<CopyVariablesHandler>(
+    'COPY_VARIABLES',
+    copyVariables
+  )
+  
+  async function copyVariables(collection: any, mode: any, exportFormat: string, valueFormat: string) {
+    exportedTokens = {}
+    let tokensToExport;
+    if (!!collection && !!mode) {
+      const variableCollection = await figma.variables.getVariableCollectionByIdAsync(collection.id);
+      if (variableCollection) {
+        tokensToExport = await fetchTokensToExport(variableCollection);
+        await processTokens(tokensToExport, variableCollection, mode, exportFormat, valueFormat);
+        debugger;
+        if (notExportedTokens.length > 0) {
+          console.warn(`Tokens not exported:\n\n${notExportedTokens.join(`\n\n`)}`);
+        }
+        if (Object.keys(exportedTokens).length < tokensToExport.length) {
+          console.error(`${tokensToExport.length - Object.keys(exportedTokens).length} tokens failed to export.`)
+        }
+        figma.notify(`Copied ${Object.keys(exportedTokens).length} of ${tokensToExport.length} tokens to clipboard.`)
+      }
+    } else {
+      figma.notify("Please select a collection and mode to export.");
+    }
+
+    let formattedExportedTokens = JSON.stringify(exportedTokens);
+    if (exportFormat === "cssVar" || exportFormat === "camelCase") {
+      formattedExportedTokens = ":root " + formattedExportedTokens;
+    }
+    formattedExportedTokens = formatCSSFromJSON(formattedExportedTokens);
+
+    // TODO: delete this by keeping the object as a JSON.
+    if (exportFormat === "dotNotation") {
+      formattedExportedTokens = convertToNestedObject(formattedExportedTokens);
+      // modify the text formatting of `formattedExportedTokens` to have the proper indentation and new lines of a nested JSON object so that it is readable
+    }
+    emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedExportedTokens)
+  }
+  
+  async function processTokens(tokensToExport: any, variableCollection: any, mode: any, exportFormat: any, valueFormat: any) {
+    const promises = tokensToExport.map((token: any) => {
+      return token ? getTokenValue(token, variableCollection, mode.modeId, exportFormat, valueFormat)
+        .catch(error => console.warn(`Error processing token: ${token?.name}. Error: ${error}`))
+        : Promise.resolve(); // If token is undefined, resolve immediately
+    });
+  
+    await Promise.all(promises);
+  }
 
   let getTokenValueCounter = 0;
   async function getTokenValue(token: Variable, variableCollection: VariableCollection, modeId: string, exportFormat: string, valueFormat: string): Promise<void> {
@@ -407,7 +396,6 @@ export default async function () {
               if (result !== undefined) { // Fix: Check if result is not undefined
                 exportToken(tokenType, result, variableCollection, token, exportFormat, valueFormat);
               } else {
-                // getTokenValue(variable, variableCollection, defaultModeIdOfVariableCollectionOfToken);
                 notExportedTokens.push(token.name);
               }
             } else {
@@ -426,103 +414,20 @@ export default async function () {
     }
   }
 
-
-  // TODO: delete this by keeping the object as a JSON.
-  function convertToNestedObject(input: string): any {
-    if (typeof input !== 'string') {
-      throw new Error('Input must be a string');
+  async function fetchTokensToExport(variableCollection: any) {
+    try {
+      const tokensToExport = await Promise.all(
+        variableCollection.variableIds.map((variableId: any) =>
+          figma.variables.getVariableByIdAsync(variableId)
+        )
+      );
+  
+      return tokensToExport; // This array will contain the resolved values or undefined if not found
+    } catch (error) {
+      console.error('Error fetching tokens:', error);
+      return []; // Return an empty array or handle as appropriate
     }
-
-    const lines = input.split('\n');
-    let result = {};
-
-    for (let line of lines) {
-      let [path, value] = line.split(':');
-
-      if (!path || typeof value !== 'string') {
-        continue; // skip this iteration if path is undefined or value is not a string
-      }
-
-      value = value.trim().replace(/'/g, "").replace(/;$/, ""); // remove single quotes and trailing semicolon from the value
-
-      const parts = path.split('.');
-      let currentLevel: { [key: string]: any } = result;
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i].trim();
-
-        if (typeof currentLevel !== 'object') {
-          throw new Error('Expected currentLevel to be an object');
-        }
-
-        if (i === parts.length - 1) {
-          currentLevel[part] = value;
-        } else {
-          if (currentLevel[part] && typeof currentLevel[part] !== 'object') {
-            currentLevel[part] = {}; // overwrite the string value with an object
-          }
-
-          if (!currentLevel[part]) {
-            currentLevel[part] = {};
-          }
-          currentLevel = currentLevel[part];
-        }
-      }
-    }
-
-    return JSON.stringify(result, null, 2);
   }
-  on<CopyVariablesHandler>(
-    'COPY_VARIABLES',
-    function (collection: any, mode: any, exportFormat: string, valueFormat: string): void {
-      exportedTokens = {}
-      let tokensToExport;
-      if (!!collection && !!mode) {
-        const variableCollection = figma.variables.getVariableCollectionById(collection.id);
-        if (variableCollection) {
-          tokensToExport = variableCollection.variableIds.map((variableId) => {
-            return figma.variables.getVariableById(variableId);
-          });
-          tokensToExport.forEach((token, index) => {
-            // console.log(`CVH - Processing token ${index + 1} of ${tokensToExport.length}...`, token, token?.name)
-            // console.log(`Processing token ${index + 1} of ${tokensToExport.length}...`, token, token?.name)
-            try {
-              if (token) {
-                // console.log(`CVH - token ${index + 1}: `, token);
-                getTokenValue(token, variableCollection, mode.modeId, exportFormat, valueFormat);
-              }
-            } catch (error) {
-              console.warn(`Error processing token: ${token?.name}. Error: ${error}`);
-            }
-          });
-          if (notExportedTokens.length > 0) {
-            console.warn(`Tokens not exported:\n\n${notExportedTokens.join(`\n\n`)}`);
-          }
-          if (Object.keys(exportedTokens).length < tokensToExport.length) {
-            console.error(`${tokensToExport.length - Object.keys(exportedTokens).length} tokens failed to export.`)
-          }
-          figma.notify(`Copied ${Object.keys(exportedTokens).length} of ${tokensToExport.length} tokens to clipboard.`)
-
-          // console.log(`Exported ${Object.keys(exportedTokens).length} of ${tokensToExport.length} tokens.`)
-        }
-      } else {
-        figma.notify("Please select a collection and mode to export.");
-      }
-
-      let formattedExportedTokens = JSON.stringify(exportedTokens);
-      if (exportFormat === "cssVar" || exportFormat === "camelCase") {
-        formattedExportedTokens = ":root " + formattedExportedTokens;
-      }
-      formattedExportedTokens = formatCSSFromJSON(formattedExportedTokens);
-
-      // TODO: delete this by keeping the object as a JSON.
-      if (exportFormat === "dotNotation") {
-        formattedExportedTokens = convertToNestedObject(formattedExportedTokens);
-        // modify the text formatting of `formattedExportedTokens` to have the proper indentation and new lines of a nested JSON object so that it is readable
-      }
-      emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedExportedTokens)
-    }
-  )
 
   function formatCSSFromJSON(json: any): string {
     // Initialize formattedExportedTokens with some JSON-like string
