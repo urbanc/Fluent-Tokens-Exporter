@@ -1,6 +1,6 @@
 import { emit, on, showUI } from '@create-figma-plugin/utilities'
 import { formatHex8 } from 'culori'
-import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON, formatCSSFromJSON } from './utils'
+import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON } from './utils'
 import { ResizeWindowHandler, GetVariablesHandler, CopyVariablesHandler, CopyToClipboard } from './types'
 
 export default async function () {
