@@ -326,54 +326,23 @@ export default async function () {
     await Promise.all(promises);
   }
 
-  let getTokenValueCounter = 0;
   async function getTokenValue(token: Variable, variableCollection: VariableCollection, modeId: string, exportFormat: string, valueFormat: string): Promise<void> {
-    // increment the getTokenValueCounter by 1
-    getTokenValueCounter++;
-    // console.log(`GTV token ${getTokenValueCounter} ...`);
-    if (getTokenValueCounter === 1) {
-      // console.log(token, variableCollection, modeId, exportFormat, valueFormat);
-    }
+
     try {
       const collectionId = variableCollection.id;
-      if (getTokenValueCounter === 1) {
-        // console.log(collectionId);
-      }
       const tokenType = token.resolvedType;
-      if (getTokenValueCounter === 1) {
-        // console.log(tokenType);
-      }
       const tokenValue = token.valuesByMode[modeId];
-      if (getTokenValueCounter === 1) {
-        // console.log("tokenValue", tokenValue);
-      }
-      if (getTokenValueCounter === 1) {
-        // console.log('(tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS")', (tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS"));
-      }
       if (tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS") {
-        if (getTokenValueCounter === 1) {
-          // console.log("tokenValue inside conditional", tokenValue);
-        }
         // @ts-ignore
         let variable: Variable | null = null;
-        // console.log('Before getVariableByIdAsync');
         try {
           if ((tokenValue as VariableAlias).type === "VARIABLE_ALIAS") { // Check if tokenValue is of type VariableAlias
             const tokenId = (tokenValue as VariableAlias).id;
-            // console.log('tokenId', tokenId);
             
             variable = await figma.variables.getVariableByIdAsync(tokenId); // Access id property
-            // console.log('After getVariableByIdAsync', variable);
           }
         } catch (error) {
           console.error('An error occurred:', error);
-        }
-        // console.log('After try-catch');
-        // const variable = tokenValue;
-        // console.log("getTokenValueCounter", getTokenValueCounter);
-        if (getTokenValueCounter === 1) {
-          // console.log("tokenValue inside conditional", tokenValue);
-          console.log("variable:", variable);
         }
         if (variable) {
           const variableCollectionOfToken = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId);
