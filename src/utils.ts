@@ -61,4 +61,27 @@ function convertToCSSVariableName(input: string): string {
     return variableName.replace(/-+$/, '');
 }
 
-export { convertToDotNotation, convertToNestedJSON, convertToCamelCase, convertToCSSVariableName };
+//Todo: DELETE ME, instead of going from JSON to CSS back to JSON. Keep it as JSON.
+function formatCSS(formattedExportedTokens: string): string {
+
+    // Replace quoted keys in JSON (excluding the colon) with unquoted keys
+    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\":/g, "$1: ");
+
+    // Replace double quotes around values with single quotes
+    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\"/g, "'$1'");
+
+    // Replace commas with a semicolon and a newline, adding two spaces for indentation
+    formattedExportedTokens = formattedExportedTokens.replace(/,/g, ";\n  ");
+
+    // Add a newline and two spaces after every opening brace for better readability
+    formattedExportedTokens = formattedExportedTokens.replace(/{/g, "{\n  ");
+
+    // Add a semicolon, newline, and closing brace to close scopes neatly
+    formattedExportedTokens = formattedExportedTokens.replace(/}/g, ";\n}");
+
+    return formattedExportedTokens;
+}
+
+//   .replace(/\"([^(\")"]+)\":/g, "$1: ").replace(/\"([^(\")"]+)\"/g, "'$1'").replace(/,/g, ";\n ").replace(/{/g, "{\n ").replace(/}/g, ";\n}");
+
+export { convertToDotNotation, convertToNestedJSON, convertToCamelCase, convertToCSSVariableName, formatCSS };

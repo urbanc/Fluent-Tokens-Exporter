@@ -1,6 +1,6 @@
 import { emit, on, showUI } from '@create-figma-plugin/utilities'
 import { formatHex8 } from 'culori'
-import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON } from './utils'
+import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON, formatCSS } from './utils'
 import { ResizeWindowHandler, GetVariablesHandler, CopyVariablesHandler, CopyToClipboard } from './types'
 
 export default async function () {
@@ -307,7 +307,7 @@ export default async function () {
     }
 
     let formattedExportedTokens = JSON.stringify(exportedTokens);
-    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\":/g, "$1: ").replace(/\"([^(\")"]+)\"/g, "'$1'").replace(/,/g, ";\n ").replace(/{/g, "{\n ").replace(/}/g, ";\n}");
+    formattedExportedTokens = formatCSS(formattedExportedTokens)
 
     // TODO: delete this by keeping the object as a JSON.
     if (exportFormat === "dotNotation") {
