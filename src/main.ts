@@ -1,6 +1,6 @@
 import { emit, on, showUI } from '@create-figma-plugin/utilities'
 import { formatHex8 } from 'culori'
-import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON } from './utils'
+import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON, formatCSSFromJSON } from './utils'
 import { ResizeWindowHandler, GetVariablesHandler, CopyVariablesHandler, CopyToClipboard } from './types'
 
 export default async function () {
@@ -294,7 +294,6 @@ export default async function () {
       if (variableCollection) {
         tokensToExport = await fetchTokensToExport(variableCollection);
         await processTokens(tokensToExport, variableCollection, mode, exportFormat, valueFormat);
-        debugger;
         if (notExportedTokens.length > 0) {
           console.warn(`Tokens not exported:\n\n${notExportedTokens.join(`\n\n`)}`);
         }
@@ -308,15 +307,11 @@ export default async function () {
     }
 
     let formattedExportedTokens = JSON.stringify(exportedTokens);
-    if (exportFormat === "cssVar" || exportFormat === "camelCase") {
-      formattedExportedTokens = ":root " + formattedExportedTokens;
-    }
-    formattedExportedTokens = formatCSSFromJSON(formattedExportedTokens);
+    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\":/g, "$1: ").replace(/\"([^(\")"]+)\"/g, "'$1'").replace(/,/g, ";\n ").replace(/{/g, "{\n ").replace(/}/g, ";\n}");
 
     // TODO: delete this by keeping the object as a JSON.
     if (exportFormat === "dotNotation") {
       formattedExportedTokens = convertToNestedObject(formattedExportedTokens);
-      // modify the text formatting of `formattedExportedTokens` to have the proper indentation and new lines of a nested JSON object so that it is readable
     }
     emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedExportedTokens)
   }
@@ -428,28 +423,6 @@ export default async function () {
       return []; // Return an empty array or handle as appropriate
     }
   }
-
-  function formatCSSFromJSON(json: any): string {
-    // Initialize formattedExportedTokens with some JSON-like string
-    let formattedExportedTokens = "...";
-
-    // Replace quoted keys in JSON (excluding the colon) with unquoted keys
-    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\":/g, "$1: ");
-
-    // Replace double quotes around values with single quotes
-    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\"/g, "'$1'");
-
-    // Replace commas with a semicolon and a newline, adding two spaces for indentation
-    formattedExportedTokens = formattedExportedTokens.replace(/,/g, ";\n  ");
-
-    // Add a newline and two spaces after every opening brace for better readability
-    formattedExportedTokens = formattedExportedTokens.replace(/{/g, "{\n  ");
-
-    // Add a semicolon, newline, and closing brace to close scopes neatly
-    formattedExportedTokens = formattedExportedTokens.replace(/}/g, ";\n}");
-
-    return formattedExportedTokens;
-  }  
 
 }
 

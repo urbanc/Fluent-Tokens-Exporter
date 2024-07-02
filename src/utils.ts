@@ -61,4 +61,4 @@ function convertToCSSVariableName(input: string): string {
     return variableName.replace(/-+$/, '');
 }
 
-export { convertToDotNotation, convertToNestedJSON, convertToCamelCase, convertToCSSVariableName };
+export { convertToDotNotation, convertToNestedJSON, convertToCamelCase, convertToCSSVariableName, formatCSSFromJSON };
