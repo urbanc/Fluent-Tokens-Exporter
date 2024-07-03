@@ -46,13 +46,7 @@ export default async function () {
   let exportedTokens: any = {}
   let notExportedTokens: string[] = [];
 
-
-  // create a counter to keep track of the number of tokens that have been processed
-  let tokenCounter = 0;
-
-  function exportToken(tokenType: string, tokenValue: any, variableCollection: VariableCollection, token: Variable, exportFormat: string, valueFormat: string): void {
-    tokenCounter++;
-
+  function exportToken(tokenType: string, tokenValue: any, token: Variable, exportFormat: string, valueFormat: string): void {
     let result;
     try {
       switch (tokenType) {
@@ -80,7 +74,6 @@ export default async function () {
               }
             }
 
-            // console.log("tokenType: ", tokenType, "tokenValue: ", tokenValue, "result: ", result);
           } catch (error) {
 
             console.warn(`Error adding COLOR token to exportedTokens: ${token.name}. Error: ${error}`);
@@ -88,27 +81,21 @@ export default async function () {
           break;
 
         case "BOOLEAN":
-          // console.warn("tokenType: ", tokenType, "tokenValue: ", tokenValue);
           try {
             if (!(tokenValue.toString().includes("/"))) {
-              // console.log("does not include /");
               const visibility = ["visible", "visibility", "show"];
               const textDecoration = ["underline", "text-decoration"];
 
               if (visibility.some(visibility => token.name.toLowerCase().includes(visibility))) {
                 result = tokenValue ? "visible" : "hidden";
-                //console.log("tokenType: ", tokenType, "tokenValue: ", tokenValue, "result: ", result);
               } else if (textDecoration.some(textDecoration => token.name.toLowerCase().includes(textDecoration))) {
                 if (token.name.toLowerCase().includes("solid")) {
                   result = "solid";
-                  //console.log("tokenType: ", tokenType, "tokenValue: ", tokenValue, "result: ", result);
                 } else if (token.name.toLowerCase().includes("dashed")) {
                   result = "dashed";
-                  //console.log("tokenType: ", tokenType, "tokenValue: ", tokenValue, "result: ", result);
                 }
               } else {
                 result = tokenValue;
-                //console.log("tokenType: ", tokenType, "tokenValue: ", tokenValue, "result: ", result);
               }
             } else if (valueFormat === "Alias name" && tokenValue.toString().includes("/")) {
               switch (exportFormat) {
@@ -135,9 +122,7 @@ export default async function () {
           // If the number is 0, leave as zero. Otherwise, if it is greater than 0, convert it to a string and append "px" as the suffix to the string.
           try {
             if (!(tokenValue.toString().includes("/"))) {
-              // console.log("does not include /");
               result = tokenValue === 0 ? '0' : tokenValue > 0 ? tokenValue + "px" : tokenValue;
-              // console.log("tokenType: ", tokenType, "tokenValue: ", tokenValue, "result: ", result);
             } else if (valueFormat === "Alias name" && tokenValue.toString().includes("/")) {
               switch (exportFormat) {
                 case "w3c":
@@ -153,7 +138,6 @@ export default async function () {
                 default:
                   let subResult = convertToCSSVariableName(tokenValue);
                   result = "var(" + subResult + ")";
-                // console.log("tokenType: ", tokenType, "tokenValue: ", tokenValue, "result: ", result);
               }
             }
           } catch (error) {
@@ -165,9 +149,7 @@ export default async function () {
         default:
           try {
             if (!(tokenValue.toString().includes("/"))) {
-              // console.log("does not include /");
               result = tokenValue;
-              // console.log("tokenType: ", tokenType, "tokenValue: ", tokenValue, "result: ", result);
             } else if (valueFormat === "Alias name" && tokenValue.toString().includes("/")) {
               switch (exportFormat) {
                 case "w3c":
@@ -231,9 +213,6 @@ export default async function () {
     }
     return theVarValue;
   }
-
-
-
 
   // TODO: delete this by keeping the object as a JSON.
   function convertToNestedObject(input: string): any {
@@ -332,45 +311,42 @@ export default async function () {
       const collectionId = variableCollection.id;
       const tokenType = token.resolvedType;
       const tokenValue = token.valuesByMode[modeId];
+
       if (tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS") {
         // @ts-ignore
         let variable: Variable | null = null;
         try {
-          if ((tokenValue as VariableAlias).type === "VARIABLE_ALIAS") { // Check if tokenValue is of type VariableAlias
+          if ((tokenValue as VariableAlias).type === "VARIABLE_ALIAS") {
             const tokenId = (tokenValue as VariableAlias).id;
-            
-            variable = await figma.variables.getVariableByIdAsync(tokenId); // Access id property
+            variable = await figma.variables.getVariableByIdAsync(tokenId);
           }
         } catch (error) {
           console.error('An error occurred:', error);
         }
+
         if (variable) {
           const variableCollectionOfToken = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId);
           if (variableCollectionOfToken && variableCollectionOfToken.id !== collectionId) {
-            const defaultModeIdOfVariableCollectionOfToken = variableCollectionOfToken.defaultModeId;
-            const variableValue = variable.valuesByMode[defaultModeIdOfVariableCollectionOfToken]
-            if (variableValue && (variableValue as VariableAlias).type === "VARIABLE_ALIAS") {
-              let result: any;
-              if (valueFormat === "Raw value") {
-                result = await (getTokenValueByIdAsync(variable.id));
-              } else if (valueFormat === "Alias name") {
-                result = variable.name;
-              }
-
-              if (result !== undefined) { // Fix: Check if result is not undefined
-                exportToken(tokenType, result, variableCollection, token, exportFormat, valueFormat);
-              } else {
-                notExportedTokens.push(token.name);
-              }
-            } else {
-              // console.warn("tokenType, variableValue, variableCollection, token, exportFormat, valueFormat", tokenType, variableValue, variableCollection, token, exportFormat, valueFormat);
-              exportToken(tokenType, variableValue, variableCollection, token, exportFormat, valueFormat);
+            let result: any;
+            if (valueFormat === "Raw value") {
+              result = await getTokenValueByIdAsync(variable.id); // Use variable.id directly to fetch the token value
+            } else if (valueFormat === "Alias name") {
+              result = variable.name; // Use variable.name directly for alias name
             }
+            if (result !== undefined) {
+              exportToken(tokenType, result, token, exportFormat, valueFormat);
+            } else {
+              notExportedTokens.push(token.name);
+            }
+          } else {
+            // If the variable collection ID matches, or if no collection is found, use the value as is
+            exportToken(tokenType, tokenValue, token, exportFormat, valueFormat);
           }
         }
       } else {
-        exportToken(tokenType, tokenValue, variableCollection, token, exportFormat, valueFormat);
+        exportToken(tokenType, tokenValue, token, exportFormat, valueFormat);
       }
+
 
 
     } catch (error) {

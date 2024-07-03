@@ -167,7 +167,7 @@ function Plugin() {
       <VerticalSpace space='large' />
       <Container space='extraSmall'>
         <Stack space='extraSmall'>
-          <Text><Bold><Muted>Variable collectionsss</Muted></Bold></Text>
+          <Text><Bold><Muted>Variable collections</Muted></Bold></Text>
           <Dropdown icon={IconVariableCollection16} onChange={handleCollectionChange} options={collectionOptions} value={collection} />
           <VerticalSpace space='small' />
           <Text><Bold><Muted>Mode</Muted></Bold></Text>
