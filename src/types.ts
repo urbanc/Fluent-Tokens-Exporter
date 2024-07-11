@@ -19,3 +19,18 @@ export interface CopyToClipboard extends EventHandler {
   name: 'COPY_TO_CLIPBOARD'
   handler: (clipboardText: string) => void
 }
+export type ExportFormat = 'cssVar' | 'camelCase' | 'dotNotation' | 'w3c';
+
+export type ValueFormat = 'Raw value' | 'Alias name';
+
+export type TokenValue = string | number | boolean;
+
+export interface VariableAlias {
+  type: 'VARIABLE_ALIAS';
+  id: string;
+}
+
+export interface Mode {
+  modeId: string
+  name: string
+}
