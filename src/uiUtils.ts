@@ -9,22 +9,25 @@
  * @param content - The content to be copied to the clipboard
  */
 function copyToClipboard(content: string) {
-    // If the context is secure and clipboard API is available, use it
-    if (
-        window.isSecureContext &&
-        typeof navigator?.clipboard?.writeText === 'function'
-    ) {
-        navigator.clipboard.writeText(content).then(function () {
+  // If the context is secure and clipboard API is available, use it
+  if (
+    window.isSecureContext &&
+    typeof navigator?.clipboard?.writeText === 'function'
+  ) {
+    navigator.clipboard.writeText(content).then(
+      function () {
         // Notify the user that the text has been copied
-        console.log("Tokens copied to clipboard");
-        }, function (err) {
-        console.error('Could not copy text: ', err);
-        });
-    }
-    // Otherwise, use the unsecured fallback
-    else {
-        unsecuredCopyToClipboard(content);
-    }
+        console.log('Tokens copied to clipboard')
+      },
+      function (err) {
+        console.error('Could not copy text: ', err)
+      }
+    )
+  }
+  // Otherwise, use the unsecured fallback
+  else {
+    unsecuredCopyToClipboard(content)
+  }
 }
 
 /**
@@ -32,24 +35,24 @@ function copyToClipboard(content: string) {
  * @param text - The text to be copied to the clipboard
  */
 function unsecuredCopyToClipboard(text: string) {
-    // Create a textarea element
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    document.body.appendChild(textArea);
+  // Create a textarea element
+  const textArea = document.createElement('textarea')
+  textArea.value = text
+  document.body.appendChild(textArea)
 
-    // Focus and select the textarea content
-    textArea.focus();
-    textArea.select();
+  // Focus and select the textarea content
+  textArea.focus()
+  textArea.select()
 
-    // Attempt to copy the text to the clipboard
-    try {
-        document.execCommand('copy');
-    } catch (e) {
-        console.error('Unable to copy content to clipboard!', e);
-    }
+  // Attempt to copy the text to the clipboard
+  try {
+    document.execCommand('copy')
+  } catch (e) {
+    console.error('Unable to copy content to clipboard!', e)
+  }
 
-    // Remove the textarea element from the DOM
-    document.body.removeChild(textArea);
+  // Remove the textarea element from the DOM
+  document.body.removeChild(textArea)
 }
 
-export default copyToClipboard;
+export default copyToClipboard

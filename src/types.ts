@@ -12,7 +12,12 @@ export interface GetVariablesHandler extends EventHandler {
 
 export interface CopyVariablesHandler extends EventHandler {
   name: 'COPY_VARIABLES'
-  handler: (collection: VariableCollection | undefined, mode: Mode | undefined, exportFormat: ExportFormat, valueFormat: ValueFormat) => void
+  handler: (
+    collection: VariableCollection | undefined,
+    mode: Mode | undefined,
+    exportFormat: ExportFormat,
+    valueFormat: ValueFormat
+  ) => void
 }
 
 export interface CopyToClipboard extends EventHandler {
@@ -20,15 +25,15 @@ export interface CopyToClipboard extends EventHandler {
   handler: (clipboardText: string) => void
 }
 
-export type ExportFormat = 'cssVar' | 'camelCase' | 'dotNotation' | 'w3c';
+export type ExportFormat = 'cssVar' | 'camelCase' | 'dotNotation' | 'w3c'
 
-export type ValueFormat = 'Raw value' | 'Alias name';
+export type ValueFormat = 'Raw value' | 'Alias name'
 
-export type TokenValue = string | number | boolean;
+export type TokenValue = string | number | boolean
 
 export interface VariableAlias {
-  type: 'VARIABLE_ALIAS';
-  id: string;
+  type: 'VARIABLE_ALIAS'
+  id: string
 }
 
 export interface Mode {

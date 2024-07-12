@@ -1,6 +1,19 @@
 import { formatHex8 } from 'culori'
-import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON } from './processExportFormat'
-import { ExportFormat, ValueFormat, VariableAlias, Mode, Variable, VariableCollection, VariableResolvedDataType } from '../types'
+import {
+  convertToCSSVariableName,
+  convertToDotNotation,
+  convertToCamelCase,
+  convertToNestedJSON,
+} from './processExportFormat'
+import {
+  ExportFormat,
+  ValueFormat,
+  VariableAlias,
+  Mode,
+  Variable,
+  VariableCollection,
+  VariableResolvedDataType,
+} from '../types'
 
 export async function processTokens(
   tokensToExport: Variable[],
@@ -13,7 +26,17 @@ export async function processTokens(
 ): Promise<void> {
   const promises = tokensToExport
     .filter((token): token is Variable => token !== null)
-    .map(token => processToken(token, variableCollection, mode.modeId, exportFormat, valueFormat, exportedTokens, notExportedTokens))
+    .map((token) =>
+      processToken(
+        token,
+        variableCollection,
+        mode.modeId,
+        exportFormat,
+        valueFormat,
+        exportedTokens,
+        notExportedTokens
+      )
+    )
   await Promise.all(promises)
 }
 
@@ -30,10 +53,25 @@ async function processToken(
     const tokenType = token.resolvedType
     const tokenValue = token.valuesByMode[modeId]
 
-    if (tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS") {
-      await handleAliasToken(token, tokenValue as VariableAlias, variableCollection, exportFormat, valueFormat, exportedTokens, notExportedTokens)
+    if (tokenValue && (tokenValue as VariableAlias).type === 'VARIABLE_ALIAS') {
+      await handleAliasToken(
+        token,
+        tokenValue as VariableAlias,
+        variableCollection,
+        exportFormat,
+        valueFormat,
+        exportedTokens,
+        notExportedTokens
+      )
     } else {
-      exportToken(tokenType, tokenValue, token, exportFormat, valueFormat, exportedTokens)
+      exportToken(
+        tokenType,
+        tokenValue,
+        token,
+        exportFormat,
+        valueFormat,
+        exportedTokens
+      )
     }
   } catch (error) {
     console.warn(`Error processing token ${token.name}:`, error)
@@ -51,18 +89,39 @@ async function handleAliasToken(
 ): Promise<void> {
   const variable = await figma.variables.getVariableByIdAsync(tokenValue.id)
   if (variable) {
-    const variableCollectionOfToken = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId)
-    if (variableCollectionOfToken && variableCollectionOfToken.id !== variableCollection.id) {
-      const result = valueFormat === "Raw value" 
-        ? await getTokenValueByIdAsync(variable.id) 
-        : variable.name
+    const variableCollectionOfToken =
+      await figma.variables.getVariableCollectionByIdAsync(
+        variable.variableCollectionId
+      )
+    if (
+      variableCollectionOfToken &&
+      variableCollectionOfToken.id !== variableCollection.id
+    ) {
+      const result =
+        valueFormat === 'Raw value'
+          ? await getTokenValueByIdAsync(variable.id)
+          : variable.name
       if (result !== undefined) {
-        exportToken(token.resolvedType, result, token, exportFormat, valueFormat, exportedTokens)
+        exportToken(
+          token.resolvedType,
+          result,
+          token,
+          exportFormat,
+          valueFormat,
+          exportedTokens
+        )
       } else {
         notExportedTokens.push(token.name)
       }
     } else {
-      exportToken(token.resolvedType, tokenValue, token, exportFormat, valueFormat, exportedTokens)
+      exportToken(
+        token.resolvedType,
+        tokenValue,
+        token,
+        exportFormat,
+        valueFormat,
+        exportedTokens
+      )
     }
   }
 }
@@ -75,7 +134,13 @@ function exportToken(
   valueFormat: ValueFormat,
   exportedTokens: Record<string, any>
 ): void {
-  const result = processTokenValue(tokenType, tokenValue, token, valueFormat, exportFormat)
+  const result = processTokenValue(
+    tokenType,
+    tokenValue,
+    token,
+    valueFormat,
+    exportFormat
+  )
   if (result !== undefined) {
     addToExportedTokens(token.name, result, exportFormat, exportedTokens)
   }
@@ -88,40 +153,47 @@ function processTokenValue(
   valueFormat: ValueFormat,
   exportFormat: ExportFormat
 ): string | undefined {
-  if (typeof tokenValue === 'string' && tokenValue.includes("/") && valueFormat === "Alias name") {
+  if (
+    typeof tokenValue === 'string' &&
+    tokenValue.includes('/') &&
+    valueFormat === 'Alias name'
+  ) {
     return processAliasName(tokenValue, exportFormat)
   }
 
   switch (tokenType) {
-    case "COLOR":
+    case 'COLOR':
       return processColorToken(tokenValue)
-    case "BOOLEAN":
+    case 'BOOLEAN':
       return processBooleanToken(tokenValue, token.name)
-    case "FLOAT":
+    case 'FLOAT':
       return processFloatToken(tokenValue)
-    case "STRING":
+    case 'STRING':
     default:
       return String(tokenValue)
   }
 }
 
-function processAliasName(tokenValue: string, exportFormat: ExportFormat): string {
+function processAliasName(
+  tokenValue: string,
+  exportFormat: ExportFormat
+): string {
   switch (exportFormat) {
-    case "w3c":
+    case 'w3c':
       return convertToCSSVariableName(tokenValue)
-    case "dotNotation":
+    case 'dotNotation':
       return convertToDotNotation(tokenValue)
-    case "camelCase":
+    case 'camelCase':
       return convertToCamelCase(tokenValue)
-    case "cssVar":
+    case 'cssVar':
     default:
       return `var(${convertToCSSVariableName(tokenValue)})`
   }
 }
 
 function processColorToken(tokenValue: any): string | undefined {
-  if (typeof tokenValue === 'object' && !tokenValue.toString().includes("/")) {
-    const tokenColorObj = { ...tokenValue, mode: "rgb", alpha: tokenValue.a }
+  if (typeof tokenValue === 'object' && !tokenValue.toString().includes('/')) {
+    const tokenColorObj = { ...tokenValue, mode: 'rgb', alpha: tokenValue.a }
     delete tokenColorObj.a
     return formatHex8(tokenColorObj) || undefined
   }
@@ -129,23 +201,29 @@ function processColorToken(tokenValue: any): string | undefined {
 }
 
 function processBooleanToken(tokenValue: boolean, tokenName: string): string {
-  const visibility = ["visible", "visibility", "show"]
-  const textDecoration = ["underline", "text-decoration"]
+  const visibility = ['visible', 'visibility', 'show']
+  const textDecoration = ['underline', 'text-decoration']
 
-  if (visibility.some(v => tokenName.toLowerCase().includes(v))) {
-    return tokenValue ? "visible" : "hidden"
-  } else if (textDecoration.some(td => tokenName.toLowerCase().includes(td))) {
-    if (tokenName.toLowerCase().includes("solid")) {
-      return "solid"
-    } else if (tokenName.toLowerCase().includes("dashed")) {
-      return "dashed"
+  if (visibility.some((v) => tokenName.toLowerCase().includes(v))) {
+    return tokenValue ? 'visible' : 'hidden'
+  } else if (
+    textDecoration.some((td) => tokenName.toLowerCase().includes(td))
+  ) {
+    if (tokenName.toLowerCase().includes('solid')) {
+      return 'solid'
+    } else if (tokenName.toLowerCase().includes('dashed')) {
+      return 'dashed'
     }
   }
   return String(tokenValue)
 }
 
 function processFloatToken(tokenValue: number): string {
-  return tokenValue === 0 ? '0' : tokenValue > 0 ? `${tokenValue}px` : String(tokenValue)
+  return tokenValue === 0
+    ? '0'
+    : tokenValue > 0
+      ? `${tokenValue}px`
+      : String(tokenValue)
 }
 
 function addToExportedTokens(
@@ -161,30 +239,46 @@ function addToExportedTokens(
   }
 
   switch (exportFormat) {
-    case "w3c":
-      Object.assign(exportedTokens, convertToNestedJSON(tokenName, processedValue))
+    case 'w3c':
+      Object.assign(
+        exportedTokens,
+        convertToNestedJSON(tokenName, processedValue)
+      )
       break
-    case "dotNotation":
+    case 'dotNotation':
       exportedTokens[convertToDotNotation(tokenName)] = processedValue
       break
-    case "camelCase":
+    case 'camelCase':
       exportedTokens[convertToCamelCase(tokenName)] = processedValue
       break
-    case "cssVar":
+    case 'cssVar':
     default:
       exportedTokens[convertToCSSVariableName(tokenName)] = processedValue
   }
 }
 
-async function getTokenValueByIdAsync(theVarID: string, getRawValue: boolean = true): Promise<any> {
-  const varId = typeof theVarID === "object" && !Array.isArray(theVarID) ? (theVarID as { id: string }).id : theVarID
+async function getTokenValueByIdAsync(
+  theVarID: string,
+  getRawValue: boolean = true
+): Promise<any> {
+  const varId =
+    typeof theVarID === 'object' && !Array.isArray(theVarID)
+      ? (theVarID as { id: string }).id
+      : theVarID
   const theVar = await figma.variables.getVariableByIdAsync(varId)
   const theCollectionID = theVar?.variableCollectionId
-  const theCollection = theCollectionID ? await figma.variables.getVariableCollectionByIdAsync(theCollectionID) : null
+  const theCollection = theCollectionID
+    ? await figma.variables.getVariableCollectionByIdAsync(theCollectionID)
+    : null
   const theModeID = theCollection ? theCollection.defaultModeId : null
-  const theVarValue = theVar && theModeID ? theVar.valuesByMode[theModeID] : varId
+  const theVarValue =
+    theVar && theModeID ? theVar.valuesByMode[theModeID] : varId
 
-  if (getRawValue && theVarValue && (theVarValue as VariableAlias).type === "VARIABLE_ALIAS") {
+  if (
+    getRawValue &&
+    theVarValue &&
+    (theVarValue as VariableAlias).type === 'VARIABLE_ALIAS'
+  ) {
     return getTokenValueByIdAsync((theVarValue as VariableAlias).id)
   }
   return theVarValue
