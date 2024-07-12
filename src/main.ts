@@ -1,6 +1,6 @@
 import { emit, on, showUI } from '@create-figma-plugin/utilities'
 import { formatCSS } from './mainUtils/processExportFormat'
-import { ResizeWindowHandler, GetVariablesHandler, CopyVariablesHandler, CopyToClipboard, ExportFormat, Mode } from './types'
+import { ResizeWindowHandler, GetVariablesHandler, CopyVariablesHandler, CopyToClipboard, ExportFormat, ValueFormat, VariableCollection, Mode, Variable } from './types'
 import { processTokens } from './mainUtils/processTokens'
 
 export default async function () {
@@ -40,7 +40,7 @@ function remapVariableCollection(lvc: VariableCollection) {
   }
 }
 
-async function copyVariables(collection: VariableCollection, mode: Mode, exportFormat: ExportFormat, valueFormat: ValueFormat) {
+async function copyVariables(collection: VariableCollection | undefined, mode: Mode | undefined, exportFormat: ExportFormat, valueFormat: ValueFormat) {
   const exportedTokens: Record<string, any> = {}
   const notExportedTokens: string[] = []
 
@@ -48,8 +48,9 @@ async function copyVariables(collection: VariableCollection, mode: Mode, exportF
     const variableCollection = await figma.variables.getVariableCollectionByIdAsync(collection.id)
     if (variableCollection) {
       const tokensToExport = await fetchTokensToExport(variableCollection)
-      await processTokens(tokensToExport, variableCollection, mode, exportFormat, valueFormat, exportedTokens, notExportedTokens)
-      handleExportResults(tokensToExport, exportedTokens, notExportedTokens)
+      const validTokens = tokensToExport.filter((token): token is Variable => token !== null)
+      await processTokens(validTokens, variableCollection, mode, exportFormat, valueFormat, exportedTokens, notExportedTokens)
+      handleExportResults(validTokens, exportedTokens, notExportedTokens)
     }
   } else {
     figma.notify("Please select a collection and mode to export.")
@@ -59,7 +60,7 @@ async function copyVariables(collection: VariableCollection, mode: Mode, exportF
   emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedExportedTokens)
 }
 
-async function fetchTokensToExport(variableCollection: VariableCollection) {
+async function fetchTokensToExport(variableCollection: VariableCollection): Promise<(Variable | null)[]> {
   try {
     return await Promise.all(
       variableCollection.variableIds.map(variableId => 

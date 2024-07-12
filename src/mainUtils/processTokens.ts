@@ -1,6 +1,6 @@
 import { formatHex8 } from 'culori'
 import { convertToCSSVariableName, convertToDotNotation, convertToCamelCase, convertToNestedJSON } from './processExportFormat'
-import { ExportFormat, ValueFormat, VariableAlias, Mode } from '../types'
+import { ExportFormat, ValueFormat, VariableAlias, Mode, Variable, VariableCollection, VariableResolvedDataType } from '../types'
 
 export async function processTokens(
   tokensToExport: Variable[],
@@ -10,10 +10,10 @@ export async function processTokens(
   valueFormat: ValueFormat,
   exportedTokens: Record<string, any>,
   notExportedTokens: string[]
-) {
+): Promise<void> {
   const promises = tokensToExport
-    .filter(token => token !== null)
-    .map(token => processToken(token!, variableCollection, mode.modeId, exportFormat, valueFormat, exportedTokens, notExportedTokens))
+    .filter((token): token is Variable => token !== null)
+    .map(token => processToken(token, variableCollection, mode.modeId, exportFormat, valueFormat, exportedTokens, notExportedTokens))
   await Promise.all(promises)
 }
 
@@ -25,7 +25,7 @@ async function processToken(
   valueFormat: ValueFormat,
   exportedTokens: Record<string, any>,
   notExportedTokens: string[]
-) {
+): Promise<void> {
   try {
     const tokenType = token.resolvedType
     const tokenValue = token.valuesByMode[modeId]
@@ -48,7 +48,7 @@ async function handleAliasToken(
   valueFormat: ValueFormat,
   exportedTokens: Record<string, any>,
   notExportedTokens: string[]
-) {
+): Promise<void> {
   const variable = await figma.variables.getVariableByIdAsync(tokenValue.id)
   if (variable) {
     const variableCollectionOfToken = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId)
@@ -74,8 +74,8 @@ function exportToken(
   exportFormat: ExportFormat,
   valueFormat: ValueFormat,
   exportedTokens: Record<string, any>
-) {
-  let result = processTokenValue(tokenType, tokenValue, token, valueFormat)
+): void {
+  const result = processTokenValue(tokenType, tokenValue, token, valueFormat, exportFormat)
   if (result !== undefined) {
     addToExportedTokens(token.name, result, exportFormat, exportedTokens)
   }
@@ -85,10 +85,11 @@ function processTokenValue(
   tokenType: VariableResolvedDataType,
   tokenValue: any,
   token: Variable,
-  valueFormat: ValueFormat
+  valueFormat: ValueFormat,
+  exportFormat: ExportFormat
 ): string | undefined {
   if (typeof tokenValue === 'string' && tokenValue.includes("/") && valueFormat === "Alias name") {
-    return processAliasName(tokenValue, token.name)
+    return processAliasName(tokenValue, exportFormat)
   }
 
   switch (tokenType) {
@@ -152,10 +153,9 @@ function addToExportedTokens(
   tokenValue: any,
   exportFormat: ExportFormat,
   exportedTokens: Record<string, any>
-) {
+): void {
   let processedValue = tokenValue
 
-  // If the value is a string and starts with "var(", ensure it's not wrapped in quotes
   if (typeof processedValue === 'string' && processedValue.startsWith('var(')) {
     processedValue = processedValue.replace(/^"|"$/g, '')
   }

@@ -1,7 +1,7 @@
 import { Bold, Button, Container, Dropdown, DropdownOption, Inline, Muted, SegmentedControl, SegmentedControlOption, Stack, Text, VerticalSpace, render, useWindowResize } from '@create-figma-plugin/ui'
 import { IconVariableCollection16, IconCopy16, IconVariableMode16 } from './icons';
 import { emit, on } from '@create-figma-plugin/utilities'
-import { ResizeWindowHandler, GetVariablesHandler, CopyToClipboard, CopyVariablesHandler } from './types'
+import { ResizeWindowHandler, GetVariablesHandler, CopyToClipboard, CopyVariablesHandler, ExportFormat, ValueFormat } from './types'
 import { JSX, h } from 'preact';
 import { useState } from 'preact/hooks';
 import styles from './styles.css';
@@ -25,15 +25,15 @@ function Plugin() {
 
   const [collection, setCollection] = useState<string>("All variable collections");
   const [mode, setMode] = useState<string>("All modes");
-  const [exportFormat, setExportFormat] = useState<string>("cssVar");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("cssVar");
 
-  const [valueFormat, setValueFormat] = useState<string>('Raw value');
+  const [valueFormat, setValueFormat] = useState<ValueFormat>('Raw value');
   const valueFormatOptions: Array<SegmentedControlOption> = [{ value: 'Raw value' }, { value: 'Alias name' }];
 
 
   function handleValueFormatChange(event: JSX.TargetedEvent<HTMLInputElement>) {
-    const newValue = event.currentTarget.value;
-    setValueFormat(newValue);
+    let asValueFormat: ValueFormat = event.currentTarget.value as ValueFormat;
+    setValueFormat(asValueFormat);
   }
 
   on<GetVariablesHandler>('GET_VARIABLES', (localVariableCollections) => {
@@ -98,7 +98,17 @@ function Plugin() {
 
   function handleExportFormatChange(event: JSX.TargetedEvent<HTMLInputElement>) {
     const newValue = event.currentTarget.value;
-    setExportFormat(newValue);
+    if (isExportFormat(newValue)) {
+      setExportFormat(newValue);
+    } else {
+      console.error(`Invalid export format: ${newValue}`);
+      // Optionally, you could set a default value or show an error message to the user
+    }
+  }
+  
+  // Add this type guard function
+  function isExportFormat(value: string): value is ExportFormat {
+    return ['cssVar', 'camelCase', 'dotNotation', 'w3c'].includes(value);
   }
 
   on<CopyToClipboard>('COPY_TO_CLIPBOARD', (text) => {
