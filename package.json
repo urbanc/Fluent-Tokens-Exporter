@@ -8,13 +8,15 @@
   "devDependencies": {
     "@create-figma-plugin/build": "^3.1.0",
     "@create-figma-plugin/tsconfig": "^3.1.0",
-    "@figma/plugin-typings": "^1.93.0",
+    "@figma/plugin-typings": "^1.97.0",
     "@types/culori": "^2.0.4",
+    "prettier": "^3.3.2",
     "typescript": ">=4"
   },
   "scripts": {
     "build": "build-figma-plugin --typecheck --minify",
-    "watch": "build-figma-plugin --typecheck --watch"
+    "watch": "build-figma-plugin --typecheck --watch",
+    "prettier": "prettier --write ."
   },
   "figma-plugin": {
     "editorType": [
