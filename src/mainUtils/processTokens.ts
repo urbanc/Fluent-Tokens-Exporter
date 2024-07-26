@@ -15,6 +15,10 @@ import {
   VariableResolvedDataType,
 } from '../types';
 
+// ==============================================
+// Main Processing Functions
+// ==============================================
+
 export async function processTokens(
   tokensToExport: Variable[],
   variableCollection: VariableCollection,
@@ -53,6 +57,7 @@ async function processToken(
     if (isVariableAlias(tokenValue)) {
       await handleAliasToken(token, tokenValue, variableCollection, exportFormat, valueFormat, exportedTokens, notExportedTokens);
     } else {
+      // Process Raw Value Token
       const processedValue = processTokenValue(token.resolvedType, tokenValue, token.name, valueFormat, exportFormat);
       if (processedValue !== undefined) {
         addToExportedTokens(token.name, processedValue, exportFormat, exportedTokens);
@@ -63,6 +68,10 @@ async function processToken(
     notExportedTokens.push(token.name);
   }
 }
+
+// ==============================================
+// Alias Token Handling
+// ==============================================
 
 async function handleAliasToken(
   token: Variable,
@@ -99,6 +108,10 @@ async function handleAliasToken(
   }
 }
 
+// ==============================================
+// Token Value Processing
+// ==============================================
+
 function processTokenValue(
   tokenType: VariableResolvedDataType,
   tokenValue: any,
@@ -123,34 +136,12 @@ function processTokenValue(
   }
 }
 
-function isAliasName(value: any): value is string {
-  return typeof value === 'string' && value.includes('/');
-}
-
-function processAliasName(tokenValue: string, exportFormat: ExportFormat): string {
-  switch (exportFormat) {
-    case 'w3c':
-      return convertToCSSVariableName(tokenValue);
-    case 'dotNotation':
-      return convertToDotNotation(tokenValue);
-    case 'camelCase':
-      return convertToCamelCase(tokenValue);
-    case 'cssVar':
-    default:
-      return `var(${convertToCSSVariableName(tokenValue)})`;
-  }
-}
-
 function processColorToken(tokenValue: any): string | undefined {
   if (isColorObject(tokenValue)) {
     const { r, g, b, a } = tokenValue;
     return formatHex8({ mode: 'rgb', r, g, b, alpha: a });
   }
   return String(tokenValue);
-}
-
-function isColorObject(value: any): value is { r: number; g: number; b: number; a: number } {
-  return typeof value === 'object' && 'r' in value && 'g' in value && 'b' in value && 'a' in value;
 }
 
 function processBooleanToken(tokenValue: boolean, tokenName: string): string {
@@ -163,26 +154,14 @@ function processBooleanToken(tokenValue: boolean, tokenName: string): string {
   return String(tokenValue);
 }
 
-function isVisibilityToken(tokenName: string): boolean {
-  const visibilityKeywords = ['visible', 'visibility', 'show'];
-  return visibilityKeywords.some(keyword => tokenName.toLowerCase().includes(keyword));
-}
-
-function isTextDecorationToken(tokenName: string): boolean {
-  const textDecorationKeywords = ['underline', 'text-decoration'];
-  return textDecorationKeywords.some(keyword => tokenName.toLowerCase().includes(keyword));
-}
-
-function getTextDecorationValue(tokenName: string): string {
-  if (tokenName.toLowerCase().includes('solid')) return 'solid';
-  if (tokenName.toLowerCase().includes('dashed')) return 'dashed';
-  return 'underline';
-}
-
 function processFloatToken(tokenValue: number): string {
   if (tokenValue === 0) return '0';
   return tokenValue > 0 ? `${tokenValue}px` : String(tokenValue);
 }
+
+// ==============================================
+// Export Formatting
+// ==============================================
 
 function addToExportedTokens(
   tokenName: string,
@@ -204,6 +183,48 @@ function addToExportedTokens(
     default:
       exportedTokens[convertToCSSVariableName(tokenName)] = tokenValue;
   }
+}
+
+function processAliasName(tokenValue: string, exportFormat: ExportFormat): string {
+  switch (exportFormat) {
+    case 'w3c':
+      return convertToCSSVariableName(tokenValue);
+    case 'dotNotation':
+      return convertToDotNotation(tokenValue);
+    case 'camelCase':
+      return convertToCamelCase(tokenValue);
+    case 'cssVar':
+    default:
+      return `var(${convertToCSSVariableName(tokenValue)})`;
+  }
+}
+
+// ==============================================
+// Helper Functions
+// ==============================================
+
+function isAliasName(value: any): value is string {
+  return typeof value === 'string' && value.includes('/');
+}
+
+function isColorObject(value: any): value is { r: number; g: number; b: number; a: number } {
+  return typeof value === 'object' && 'r' in value && 'g' in value && 'b' in value && 'a' in value;
+}
+
+function isVisibilityToken(tokenName: string): boolean {
+  const visibilityKeywords = ['visible', 'visibility', 'show'];
+  return visibilityKeywords.some(keyword => tokenName.toLowerCase().includes(keyword));
+}
+
+function isTextDecorationToken(tokenName: string): boolean {
+  const textDecorationKeywords = ['underline', 'text-decoration'];
+  return textDecorationKeywords.some(keyword => tokenName.toLowerCase().includes(keyword));
+}
+
+function getTextDecorationValue(tokenName: string): string {
+  if (tokenName.toLowerCase().includes('solid')) return 'solid';
+  if (tokenName.toLowerCase().includes('dashed')) return 'dashed';
+  return 'underline';
 }
 
 function isVariableAlias(value: any): value is VariableAlias {
