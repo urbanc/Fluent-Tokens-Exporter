@@ -82,7 +82,7 @@ async function ProcessVariables(
 
   const exportedTokens = await exportVariables(variableCollection, mode, exportFormat, valueFormat)
   
-  handleExportResults(exportedTokens)
+  figma.notify(`Copied ${Object.keys(exportedTokens).length} tokens to clipboard.`)
   
   const formattedTokens = formatExportedTokens(exportedTokens, exportFormat);
   emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedTokens)
@@ -113,44 +113,40 @@ async function fetchTokensToExport(variableCollection: VariableCollection): Prom
   }
 }
 
-function handleExportResults(exportedTokens: Record<string, any>) {
-  figma.notify(`Copied ${Object.keys(exportedTokens).length} tokens to clipboard.`)
-}
-
 function formatExportedTokens(exportedTokens: Record<string, any>, exportFormat: ExportFormat): string {
-  // In order to pass objects between main.ts and ui.tsx, the JSON must be serialized as a string
-  // and parsed back into a JSON in the ui.tsx side.
-  let formattedTokens = JSON.stringify(exportedTokens, null, 2);
-
-  return exportFormat === 'dotNotation'
-    ? convertToNestedObject(formattedTokens)
-    : formattedTokens;
+  if (exportFormat === 'dotNotation') {
+    return JSON.stringify(convertToNestedObject(exportedTokens), null, 2);
+  }
+  return JSON.stringify(exportedTokens, null, 2);
 }
 
-function convertToNestedObject(input: string): string {
-  const lines = input.split('\n')
-  const result: Record<string, any> = {}
+function convertToNestedObject(flatObject: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
 
-  for (const line of lines) {
-    const [path, value] = line.split(':').map(part => part.trim())
-    if (path && value) {
-      const cleanValue = value.replace(/'/g, '').replace(/;$/, '')
-      setNestedProperty(result, path.split('.'), cleanValue)
-    }
+  for (const [key, value] of Object.entries(flatObject)) {
+    setNestedProperty(result, key.split('.'), value);
   }
 
-  return JSON.stringify(result, null, 2)
+  return result;
 }
 
-function setNestedProperty(obj: Record<string, any>, path: string[], value: string): void {
-  let current = obj
+function setNestedProperty(obj: Record<string, any>, path: string[], value: any): void {
+  let current = obj;
   for (let i = 0; i < path.length; i++) {
-    const key = path[i]
+
+    // Hack to fix bug: for extra `\"` in dotNotation/JSON output (Ex. `"\"page": {`)
+    const key = path[i].replace(/^"/, '').replace(/"$/, ''); // Remove starting and ending quotes
     if (i === path.length - 1) {
-      current[key] = value
+      current[key] = value;
     } else {
-      current[key] = current[key] || {}
-      current = current[key]
+      if (typeof current[key] === 'string') {
+        // If we encounter a string value in the middle of the path,
+        // convert it to an object with a special key for the original value
+        current[key] = { '_value': current[key] };
+      } else if (current[key] === undefined) {
+        current[key] = {};
+      }
+      current = current[key];
     }
   }
 }
