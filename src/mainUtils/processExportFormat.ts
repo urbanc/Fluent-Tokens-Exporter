@@ -48,20 +48,6 @@ export function convertToCSSVariableName(input: string): string {
     .replace(/-+$/, '');
 }
 
-/**
- * Formats a JSON string as CSS.
- * @param json The JSON string to format.
- * @returns The formatted CSS string.
- */
-export function formatCSS(json: string): string {
-  return json
-    .replace(/\"([^(\")"]+)\":/g, '$1: ')
-    .replace(/\"([^(\")"]+)\"/g, "'$1'")
-    .replace(/,/g, ';\n  ')
-    .replace(/{/g, '{\n  ')
-    .replace(/}/g, ';\n}');
-}
-
 // Helper functions
 
 function preprocessInput(input: string): string[] {

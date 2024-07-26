@@ -1,5 +1,4 @@
 import { emit, on, showUI } from '@create-figma-plugin/utilities'
-import { formatCSS } from './mainUtils/processExportFormat'
 import {
   ResizeWindowHandler,
   GetVariablesHandler,
@@ -119,11 +118,13 @@ function handleExportResults(exportedTokens: Record<string, any>) {
 }
 
 function formatExportedTokens(exportedTokens: Record<string, any>, exportFormat: ExportFormat): string {
-  let formattedTokens = JSON.stringify(exportedTokens)
-  formattedTokens = formatCSS(formattedTokens)
+  // In order to pass objects between main.ts and ui.tsx, the JSON must be serialized as a string
+  // and parsed back into a JSON in the ui.tsx side.
+  let formattedTokens = JSON.stringify(exportedTokens, null, 2);
+
   return exportFormat === 'dotNotation'
     ? convertToNestedObject(formattedTokens)
-    : formattedTokens
+    : formattedTokens;
 }
 
 function convertToNestedObject(input: string): string {

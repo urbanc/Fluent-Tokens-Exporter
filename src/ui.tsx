@@ -170,8 +170,8 @@ function Plugin() {
   }
 
   // 5) Save to clipboard
-  on<CopyToClipboard>('COPY_TO_CLIPBOARD', (text) => {
-    copyToClipboard(text)
+  on<CopyToClipboard>('COPY_TO_CLIPBOARD', (formattedTokens) => {
+    copyToClipboard(formattedTokens)
   })
 
   return (
