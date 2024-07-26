@@ -85,7 +85,7 @@ async function ProcessVariables(
   
   handleExportResults(exportedTokens)
   
-  const formattedTokens = formatExportedTokens(exportedTokens, exportFormat)
+  const formattedTokens = formatExportedTokens(exportedTokens, exportFormat);
   emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedTokens)
 }
 

@@ -190,26 +190,20 @@ function addToExportedTokens(
   exportFormat: ExportFormat,
   exportedTokens: Record<string, any>
 ): void {
-  const processedValue = cleanProcessedValue(tokenValue);
-
   switch (exportFormat) {
     case 'w3c':
-      Object.assign(exportedTokens, convertToNestedJSON(tokenName, processedValue));
+      Object.assign(exportedTokens, convertToNestedJSON(tokenName, tokenValue));
       break;
     case 'dotNotation':
-      exportedTokens[convertToDotNotation(tokenName)] = processedValue;
+      exportedTokens[convertToDotNotation(tokenName)] = tokenValue;
       break;
     case 'camelCase':
-      exportedTokens[convertToCamelCase(tokenName)] = processedValue;
+      exportedTokens[convertToCamelCase(tokenName)] = tokenValue;
       break;
     case 'cssVar':
     default:
-      exportedTokens[convertToCSSVariableName(tokenName)] = processedValue;
+      exportedTokens[convertToCSSVariableName(tokenName)] = tokenValue;
   }
-}
-
-function cleanProcessedValue(value: string): string {
-  return value.startsWith('var(') ? value.replace(/^"|"$/g, '') : value;
 }
 
 function isVariableAlias(value: any): value is VariableAlias {
