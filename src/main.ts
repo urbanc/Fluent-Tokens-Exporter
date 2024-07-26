@@ -3,7 +3,7 @@ import { formatCSS } from './mainUtils/processExportFormat'
 import {
   ResizeWindowHandler,
   GetVariablesHandler,
-  CopyVariablesHandler,
+  ProcessVariablesHandler,
   CopyToClipboard,
   ExportFormat,
   ValueFormat,
@@ -14,25 +14,38 @@ import {
 import { processTokens } from './mainUtils/processTokens'
 
 export default async function () {
+  await initializePlugin()
+}
+
+async function initializePlugin() {
   setupEventListeners()
-  showUI({ height: 330, width: 240 })
-  const localVariableCollections = await fetchRemappedVariableCollections()
-  emit<GetVariablesHandler>('GET_VARIABLES', localVariableCollections)
+  await showPluginUI()
+  await sendVariablesToUI()
 }
 
 function setupEventListeners() {
   on<ResizeWindowHandler>('RESIZE_WINDOW', handleWindowResize)
-  on<CopyVariablesHandler>('COPY_VARIABLES', copyVariables)
+  on<ProcessVariablesHandler>('PROCESS_VARIABLES', ProcessVariables)
+}
+
+async function showPluginUI() {
+  showUI({ height: 330, width: 240 })
+}
+
+// Step 1) get local Figma Collections of Variables
+async function sendVariablesToUI() {
+  const localVariableCollections = await fetchRemappedVariableCollections()
+  emit<GetVariablesHandler>('GET_VARIABLES', localVariableCollections)
 }
 
 function handleWindowResize(windowSize: { width: number; height: number }) {
   figma.ui.resize(windowSize.width, windowSize.height)
 }
 
-async function fetchRemappedVariableCollections() {
+// Variable Processing
+async function fetchRemappedVariableCollections(): Promise<VariableCollection[]> {
   try {
-    const localVariableCollections =
-      await figma.variables.getLocalVariableCollectionsAsync()
+    const localVariableCollections = await figma.variables.getLocalVariableCollectionsAsync()
     return localVariableCollections.map(remapVariableCollection)
   } catch (error) {
     console.error('Failed to fetch variable collections:', error)
@@ -40,62 +53,58 @@ async function fetchRemappedVariableCollections() {
   }
 }
 
-function remapVariableCollection(lvc: VariableCollection) {
+function remapVariableCollection(collection: VariableCollection): VariableCollection {
   return {
-    ...lvc,
-    name: lvc.name,
-    id: lvc.id,
-    defaultModeId: lvc.defaultModeId,
-    modes: lvc.modes,
-    variableIds: lvc.variableIds,
+    name: collection.name,
+    id: collection.id,
+    defaultModeId: collection.defaultModeId,
+    modes: collection.modes,
+    variableIds: collection.variableIds,
   }
 }
 
-async function copyVariables(
+// Step 4) Process the selected Figma Collection Variables into Design Tokens depending on the selected ExportFormat & ValueFormat
+async function ProcessVariables(
   collection: VariableCollection | undefined,
   mode: Mode | undefined,
   exportFormat: ExportFormat,
   valueFormat: ValueFormat
 ) {
-  const exportedTokens: Record<string, any> = {}
-  const notExportedTokens: string[] = []
-
-  if (collection && mode) {
-    const variableCollection =
-      await figma.variables.getVariableCollectionByIdAsync(collection.id)
-    if (variableCollection) {
-      const tokensToExport = await fetchTokensToExport(variableCollection)
-      const validTokens = tokensToExport.filter(
-        (token): token is Variable => token !== null
-      )
-      await processTokens(
-        validTokens,
-        variableCollection,
-        mode,
-        exportFormat,
-        valueFormat,
-        exportedTokens,
-        notExportedTokens
-      )
-      handleExportResults(validTokens, exportedTokens, notExportedTokens)
-    }
-  } else {
+  if (!collection || !mode) {
     figma.notify('Please select a collection and mode to export.')
+    return
   }
 
-  const formattedExportedTokens = formatExportedTokens(
-    exportedTokens,
-    exportFormat
-  )
-  emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedExportedTokens)
+  const variableCollection = await figma.variables.getVariableCollectionByIdAsync(collection.id)
+  if (!variableCollection) {
+    figma.notify('Failed to fetch variable collection.')
+    return
+  }
+
+  const exportedTokens = await exportVariables(variableCollection, mode, exportFormat, valueFormat)
+  
+  handleExportResults(exportedTokens)
+  
+  const formattedTokens = formatExportedTokens(exportedTokens, exportFormat)
+  emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedTokens)
 }
 
-async function fetchTokensToExport(
-  variableCollection: VariableCollection
-): Promise<(Variable | null)[]> {
+async function exportVariables(
+  variableCollection: VariableCollection,
+  mode: Mode,
+  exportFormat: ExportFormat,
+  valueFormat: ValueFormat
+): Promise<Record<string, any>> {
+  const tokensToExport = await fetchTokensToExport(variableCollection)
+  const validTokens = tokensToExport.filter((token): token is Variable => token !== null)
+  
+  return processTokens(validTokens, variableCollection, mode, exportFormat, valueFormat)
+}
+
+async function fetchTokensToExport(variableCollection: VariableCollection): Promise<(Variable | null)[]> {
   try {
     return await Promise.all(
-      variableCollection.variableIds.map((variableId) =>
+      variableCollection.variableIds.map(variableId => 
         figma.variables.getVariableByIdAsync(variableId)
       )
     )
@@ -105,28 +114,11 @@ async function fetchTokensToExport(
   }
 }
 
-function handleExportResults(
-  tokensToExport: Variable[],
-  exportedTokens: Record<string, any>,
-  notExportedTokens: string[]
-) {
-  if (notExportedTokens.length > 0) {
-    console.warn(`Tokens not exported:\n\n${notExportedTokens.join(`\n\n`)}`)
-  }
-  if (Object.keys(exportedTokens).length < tokensToExport.length) {
-    console.error(
-      `${tokensToExport.length - Object.keys(exportedTokens).length} tokens failed to export.`
-    )
-  }
-  figma.notify(
-    `Copied ${Object.keys(exportedTokens).length} of ${tokensToExport.length} tokens to clipboard.`
-  )
+function handleExportResults(exportedTokens: Record<string, any>) {
+  figma.notify(`Copied ${Object.keys(exportedTokens).length} tokens to clipboard.`)
 }
 
-function formatExportedTokens(
-  exportedTokens: Record<string, any>,
-  exportFormat: ExportFormat
-): string {
+function formatExportedTokens(exportedTokens: Record<string, any>, exportFormat: ExportFormat): string {
   let formattedTokens = JSON.stringify(exportedTokens)
   formattedTokens = formatCSS(formattedTokens)
   return exportFormat === 'dotNotation'
@@ -139,25 +131,25 @@ function convertToNestedObject(input: string): string {
   const result: Record<string, any> = {}
 
   for (const line of lines) {
-    const [path, value] = line.split(':')
-    if (path && typeof value === 'string') {
-      const cleanValue = value.trim().replace(/'/g, '').replace(/;$/, '')
-      const parts = path.split('.')
-      let currentLevel: Record<string, any> = result
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i].trim()
-        if (i === parts.length - 1) {
-          currentLevel[part] = cleanValue
-        } else {
-          if (typeof currentLevel[part] !== 'object') {
-            currentLevel[part] = {}
-          }
-          currentLevel = currentLevel[part]
-        }
-      }
+    const [path, value] = line.split(':').map(part => part.trim())
+    if (path && value) {
+      const cleanValue = value.replace(/'/g, '').replace(/;$/, '')
+      setNestedProperty(result, path.split('.'), cleanValue)
     }
   }
 
   return JSON.stringify(result, null, 2)
+}
+
+function setNestedProperty(obj: Record<string, any>, path: string[], value: string): void {
+  let current = obj
+  for (let i = 0; i < path.length; i++) {
+    const key = path[i]
+    if (i === path.length - 1) {
+      current[key] = value
+    } else {
+      current[key] = current[key] || {}
+      current = current[key]
+    }
+  }
 }

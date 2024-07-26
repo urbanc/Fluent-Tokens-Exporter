@@ -24,7 +24,7 @@ import {
   ResizeWindowHandler,
   GetVariablesHandler,
   CopyToClipboard,
-  CopyVariablesHandler,
+  ProcessVariablesHandler,
   ExportFormat,
   ValueFormat,
 } from './types'
@@ -74,6 +74,7 @@ function Plugin() {
     setValueFormat(asValueFormat)
   }
 
+  // Step 2) recieve local Figma Variable Collections and update UI with options to select.
   on<GetVariablesHandler>('GET_VARIABLES', (localVariableCollections) => {
     setLocalVariableCollections(localVariableCollections)
     let newCollectionOptions: { value: string }[] = []
@@ -92,6 +93,8 @@ function Plugin() {
     setModeOptions([...modeOptions, ...newModesOptions])
   })
 
+
+  // Step 3) using user selected Figma Variable Collection & Figma Variable Mode
   function handleCopy(event: JSX.TargetedEvent<HTMLButtonElement>) {
     const selectedCollection = localVariableCollections.find(
       (element) => element.name == collection
@@ -99,8 +102,8 @@ function Plugin() {
     const selectedMode = selectedCollection?.modes.find(
       (element) => element.name == mode
     )
-    emit<CopyVariablesHandler>(
-      'COPY_VARIABLES',
+    emit<ProcessVariablesHandler>(
+      'PROCESS_VARIABLES',
       selectedCollection,
       selectedMode,
       exportFormat,
@@ -109,14 +112,14 @@ function Plugin() {
   }
 
   function handleCollectionChange(event: JSX.TargetedEvent<HTMLInputElement>) {
-    const newValue = event.currentTarget.value
+    const newSelectedCollection = event.currentTarget.value
     let newModesOptions: Array<
       { value: string } | { header: string } | string
     > = []
-    setCollection(newValue)
-    // find the element in the localVariableCollections array, in which collection.name == newValue
+    setCollection(newSelectedCollection)
+    // find the element in the localVariableCollections array, in which collection.name == newSelectedCollection
     const selectedCollection = localVariableCollections.find(
-      (collection) => collection.name == newValue
+      (collection) => collection.name == newSelectedCollection
     )
     // based on the selectedCollection, create a new array of modes to replace the modeOptions
     if (selectedCollection) {
@@ -147,27 +150,26 @@ function Plugin() {
   }
 
   function handleModeChange(event: JSX.TargetedEvent<HTMLInputElement>) {
-    const newValue = event.currentTarget.value
-    setMode(newValue)
+    const newMode = event.currentTarget.value
+    setMode(newMode)
   }
 
   function handleExportFormatChange(
     event: JSX.TargetedEvent<HTMLInputElement>
   ) {
-    const newValue = event.currentTarget.value
-    if (isExportFormat(newValue)) {
-      setExportFormat(newValue)
+    const newFormat = event.currentTarget.value
+    if (isExportFormat(newFormat)) {
+      setExportFormat(newFormat)
     } else {
-      console.error(`Invalid export format: ${newValue}`)
-      // Optionally, you could set a default value or show an error message to the user
+      console.error(`Invalid export format: ${newFormat}`)
     }
   }
 
-  // Add this type guard function
   function isExportFormat(value: string): value is ExportFormat {
     return ['cssVar', 'camelCase', 'dotNotation', 'w3c'].includes(value)
   }
 
+  // 5) Save to clipboard
   on<CopyToClipboard>('COPY_TO_CLIPBOARD', (text) => {
     copyToClipboard(text)
   })

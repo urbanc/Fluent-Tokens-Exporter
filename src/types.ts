@@ -10,8 +10,8 @@ export interface GetVariablesHandler extends EventHandler {
   handler: (localVariableCollections: VariableCollection[]) => void
 }
 
-export interface CopyVariablesHandler extends EventHandler {
-  name: 'COPY_VARIABLES'
+export interface ProcessVariablesHandler extends EventHandler {
+  name: 'PROCESS_VARIABLES'
   handler: (
     collection: VariableCollection | undefined,
     mode: Mode | undefined,
