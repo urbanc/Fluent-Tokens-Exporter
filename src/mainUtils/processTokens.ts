@@ -169,19 +169,34 @@ function addToExportedTokens(
   exportFormat: ExportFormat,
   exportedTokens: Record<string, any>
 ): void {
+  let key: string;
   switch (exportFormat) {
     case 'w3c':
       Object.assign(exportedTokens, convertToNestedJSON(tokenName, tokenValue));
-      break;
+      return;
     case 'dotNotation':
-      exportedTokens[convertToDotNotation(tokenName)] = tokenValue;
+      key = convertToDotNotation(tokenName);
       break;
     case 'camelCase':
-      exportedTokens[convertToCamelCase(tokenName)] = tokenValue;
+      key = convertToCamelCase(tokenName);
       break;
     case 'cssVar':
     default:
-      exportedTokens[convertToCSSVariableName(tokenName)] = tokenValue;
+      key = convertToCSSVariableName(tokenName);
+      break;
+  }
+  
+  // Handle nested structures
+  const parts = key.split('.');
+  let current = exportedTokens;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (i === parts.length - 1) {
+      current[part] = tokenValue;
+    } else {
+      current[part] = current[part] || {};
+      current = current[part];
+    }
   }
 }
 

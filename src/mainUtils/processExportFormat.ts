@@ -33,7 +33,22 @@ export function convertToNestedJSON(input: string, value: TokenValue): Record<st
  * @returns The token name in camelCase format.
  */
 export function convertToCamelCase(input: string): string {
-  return toCamelCase(splitByNonAlphanumeric(preprocessInput(input).join('')));
+  // Split the input string by dots to handle nested structures
+  const segments = input.split('.');
+  
+  // Convert each segment to camelCase and join them back with dots
+  return segments.map(segment => {
+    // Split the segment by non-alphanumeric characters
+    const words = segment.split(/[^a-zA-Z0-9]+/);
+    
+    // Apply camelCase to each word in the segment
+    return words
+      .filter(word => word.length > 0)
+      .map((word, index) => 
+        index === 0 ? word.toLowerCase() : capitalize(word)
+      )
+      .join('');
+  }).join('.');
 }
 
 /**
