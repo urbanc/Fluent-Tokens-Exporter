@@ -1,10 +1,10 @@
-import { formatHex8 } from 'culori'
+import { formatHex8 } from 'culori';
 import {
   convertToCSSVariableName,
   convertToDotNotation,
   convertToCamelCase,
   convertToNestedJSON,
-} from './processExportFormat'
+} from './processExportFormat';
 import {
   ExportFormat,
   ValueFormat,
@@ -13,31 +13,33 @@ import {
   Variable,
   VariableCollection,
   VariableResolvedDataType,
-} from '../types'
+} from '../types';
+
+// ==============================================
+// Main Processing Functions
+// ==============================================
 
 export async function processTokens(
   tokensToExport: Variable[],
   variableCollection: VariableCollection,
   mode: Mode,
   exportFormat: ExportFormat,
-  valueFormat: ValueFormat,
-  exportedTokens: Record<string, any>,
-  notExportedTokens: string[]
-): Promise<void> {
-  const promises = tokensToExport
-    .filter((token): token is Variable => token !== null)
-    .map((token) =>
-      processToken(
-        token,
-        variableCollection,
-        mode.modeId,
-        exportFormat,
-        valueFormat,
-        exportedTokens,
-        notExportedTokens
-      )
+  valueFormat: ValueFormat
+): Promise<Record<string, any>> {
+  const exportedTokens: Record<string, any> = {};
+  const notExportedTokens: string[] = [];
+
+  await Promise.all(
+    tokensToExport.map(token =>
+      processToken(token, variableCollection, mode.modeId, exportFormat, valueFormat, exportedTokens, notExportedTokens)
     )
-  await Promise.all(promises)
+  );
+
+  if (notExportedTokens.length > 0) {
+    console.warn(`Tokens not exported:\n${notExportedTokens.join('\n')}`);
+  }
+
+  return exportedTokens;
 }
 
 async function processToken(
@@ -50,33 +52,26 @@ async function processToken(
   notExportedTokens: string[]
 ): Promise<void> {
   try {
-    const tokenType = token.resolvedType
-    const tokenValue = token.valuesByMode[modeId]
+    const tokenValue = token.valuesByMode[modeId];
 
-    if (tokenValue && (tokenValue as VariableAlias).type === 'VARIABLE_ALIAS') {
-      await handleAliasToken(
-        token,
-        tokenValue as VariableAlias,
-        variableCollection,
-        exportFormat,
-        valueFormat,
-        exportedTokens,
-        notExportedTokens
-      )
+    if (isVariableAlias(tokenValue)) {
+      await handleAliasToken(token, tokenValue, variableCollection, exportFormat, valueFormat, exportedTokens, notExportedTokens);
     } else {
-      exportToken(
-        tokenType,
-        tokenValue,
-        token,
-        exportFormat,
-        valueFormat,
-        exportedTokens
-      )
+      // Process Raw Value Token
+      const processedValue = processTokenValue(token.resolvedType, tokenValue, token.name, valueFormat, exportFormat);
+      if (processedValue !== undefined) {
+        addToExportedTokens(token.name, processedValue, exportFormat, exportedTokens);
+      }
     }
   } catch (error) {
-    console.warn(`Error processing token ${token.name}:`, error)
+    console.warn(`Error processing token ${token.name}:`, error);
+    notExportedTokens.push(token.name);
   }
 }
+
+// ==============================================
+// Alias Token Handling
+// ==============================================
 
 async function handleAliasToken(
   token: Variable,
@@ -87,144 +82,86 @@ async function handleAliasToken(
   exportedTokens: Record<string, any>,
   notExportedTokens: string[]
 ): Promise<void> {
-  const variable = await figma.variables.getVariableByIdAsync(tokenValue.id)
-  if (variable) {
-    const variableCollectionOfToken =
-      await figma.variables.getVariableCollectionByIdAsync(
-        variable.variableCollectionId
-      )
-    if (
-      variableCollectionOfToken &&
-      variableCollectionOfToken.id !== variableCollection.id
-    ) {
-      const result =
-        valueFormat === 'Raw value'
-          ? await getTokenValueByIdAsync(variable.id)
-          : variable.name
-      if (result !== undefined) {
-        exportToken(
-          token.resolvedType,
-          result,
-          token,
-          exportFormat,
-          valueFormat,
-          exportedTokens
-        )
-      } else {
-        notExportedTokens.push(token.name)
-      }
-    } else {
-      exportToken(
-        token.resolvedType,
-        tokenValue,
-        token,
-        exportFormat,
-        valueFormat,
-        exportedTokens
-      )
-    }
+  const aliasedVariable = await figma.variables.getVariableByIdAsync(tokenValue.id);
+  
+  if (!aliasedVariable) {
+    notExportedTokens.push(token.name);
+    return;
+  }
+
+  const aliasedCollection = await figma.variables.getVariableCollectionByIdAsync(aliasedVariable.variableCollectionId);
+
+  if (!aliasedCollection) {
+    notExportedTokens.push(token.name);
+    return;
+  }
+
+  const processedValue = valueFormat === 'Raw value'
+    ? await getTokenValueByIdAsync(aliasedVariable.id)
+    : aliasedVariable.name;
+
+  if (processedValue !== undefined) {
+    const finalValue = processTokenValue(token.resolvedType, processedValue, token.name, valueFormat, exportFormat);
+    addToExportedTokens(token.name, finalValue, exportFormat, exportedTokens);
+  } else {
+    notExportedTokens.push(token.name);
   }
 }
 
-function exportToken(
-  tokenType: VariableResolvedDataType,
-  tokenValue: any,
-  token: Variable,
-  exportFormat: ExportFormat,
-  valueFormat: ValueFormat,
-  exportedTokens: Record<string, any>
-): void {
-  const result = processTokenValue(
-    tokenType,
-    tokenValue,
-    token,
-    valueFormat,
-    exportFormat
-  )
-  if (result !== undefined) {
-    addToExportedTokens(token.name, result, exportFormat, exportedTokens)
-  }
-}
+// ==============================================
+// Token Value Processing
+// ==============================================
 
 function processTokenValue(
   tokenType: VariableResolvedDataType,
   tokenValue: any,
-  token: Variable,
+  tokenName: string,
   valueFormat: ValueFormat,
   exportFormat: ExportFormat
 ): string | undefined {
-  if (
-    typeof tokenValue === 'string' &&
-    tokenValue.includes('/') &&
-    valueFormat === 'Alias name'
-  ) {
-    return processAliasName(tokenValue, exportFormat)
+  if (isAliasName(tokenValue) && valueFormat === 'Alias name') {
+    return processAliasName(tokenValue, exportFormat);
   }
 
   switch (tokenType) {
     case 'COLOR':
-      return processColorToken(tokenValue)
+      return processColorToken(tokenValue);
     case 'BOOLEAN':
-      return processBooleanToken(tokenValue, token.name)
+      return processBooleanToken(tokenValue, tokenName);
     case 'FLOAT':
-      return processFloatToken(tokenValue)
+      return processFloatToken(tokenValue);
     case 'STRING':
     default:
-      return String(tokenValue)
-  }
-}
-
-function processAliasName(
-  tokenValue: string,
-  exportFormat: ExportFormat
-): string {
-  switch (exportFormat) {
-    case 'w3c':
-      return convertToCSSVariableName(tokenValue)
-    case 'dotNotation':
-      return convertToDotNotation(tokenValue)
-    case 'camelCase':
-      return convertToCamelCase(tokenValue)
-    case 'cssVar':
-    default:
-      return `var(${convertToCSSVariableName(tokenValue)})`
+      return String(tokenValue);
   }
 }
 
 function processColorToken(tokenValue: any): string | undefined {
-  if (typeof tokenValue === 'object' && !tokenValue.toString().includes('/')) {
-    const tokenColorObj = { ...tokenValue, mode: 'rgb', alpha: tokenValue.a }
-    delete tokenColorObj.a
-    return formatHex8(tokenColorObj) || undefined
+  if (isColorObject(tokenValue)) {
+    const { r, g, b, a } = tokenValue;
+    return formatHex8({ mode: 'rgb', r, g, b, alpha: a });
   }
-  return String(tokenValue)
+  return String(tokenValue);
 }
 
 function processBooleanToken(tokenValue: boolean, tokenName: string): string {
-  const visibility = ['visible', 'visibility', 'show']
-  const textDecoration = ['underline', 'text-decoration']
-
-  if (visibility.some((v) => tokenName.toLowerCase().includes(v))) {
-    return tokenValue ? 'visible' : 'hidden'
-  } else if (
-    textDecoration.some((td) => tokenName.toLowerCase().includes(td))
-  ) {
-    if (tokenName.toLowerCase().includes('solid')) {
-      return 'solid'
-    } else if (tokenName.toLowerCase().includes('dashed')) {
-      return 'dashed'
-    }
+  if (isVisibilityToken(tokenName)) {
+    return tokenValue ? 'visible' : 'hidden';
   }
-  return String(tokenValue)
+  if (isTextDecorationToken(tokenName)) {
+    return getTextDecorationValue(tokenName);
+  }
+  return String(tokenValue);
 }
 
 function processFloatToken(tokenValue: number): string {
-  return tokenValue === 0
-    ? '0'
-    : tokenValue > 0
-      ? `${tokenValue}px`
-      : String(tokenValue)
+  if (tokenValue === 0) return '0';
+  return tokenValue > 0 ? `${tokenValue}px` : String(tokenValue);
 }
+
+// ==============================================
+// Export Formatting
+// ==============================================
 
 function addToExportedTokens(
   tokenName: string,
@@ -232,54 +169,95 @@ function addToExportedTokens(
   exportFormat: ExportFormat,
   exportedTokens: Record<string, any>
 ): void {
-  let processedValue = tokenValue
-
-  if (typeof processedValue === 'string' && processedValue.startsWith('var(')) {
-    processedValue = processedValue.replace(/^"|"$/g, '')
-  }
-
+  let key: string;
   switch (exportFormat) {
     case 'w3c':
-      Object.assign(
-        exportedTokens,
-        convertToNestedJSON(tokenName, processedValue)
-      )
-      break
+      Object.assign(exportedTokens, convertToNestedJSON(tokenName, tokenValue));
+      return;
     case 'dotNotation':
-      exportedTokens[convertToDotNotation(tokenName)] = processedValue
-      break
+      key = convertToDotNotation(tokenName);
+      break;
     case 'camelCase':
-      exportedTokens[convertToCamelCase(tokenName)] = processedValue
-      break
+      key = convertToCamelCase(tokenName);
+      break;
     case 'cssVar':
     default:
-      exportedTokens[convertToCSSVariableName(tokenName)] = processedValue
+      key = convertToCSSVariableName(tokenName);
+      break;
+  }
+  
+  // Handle nested structures
+  const parts = key.split('.');
+  let current = exportedTokens;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (i === parts.length - 1) {
+      current[part] = tokenValue;
+    } else {
+      current[part] = current[part] || {};
+      current = current[part];
+    }
   }
 }
 
-async function getTokenValueByIdAsync(
-  theVarID: string,
-  getRawValue: boolean = true
-): Promise<any> {
-  const varId =
-    typeof theVarID === 'object' && !Array.isArray(theVarID)
-      ? (theVarID as { id: string }).id
-      : theVarID
-  const theVar = await figma.variables.getVariableByIdAsync(varId)
-  const theCollectionID = theVar?.variableCollectionId
-  const theCollection = theCollectionID
-    ? await figma.variables.getVariableCollectionByIdAsync(theCollectionID)
-    : null
-  const theModeID = theCollection ? theCollection.defaultModeId : null
-  const theVarValue =
-    theVar && theModeID ? theVar.valuesByMode[theModeID] : varId
-
-  if (
-    getRawValue &&
-    theVarValue &&
-    (theVarValue as VariableAlias).type === 'VARIABLE_ALIAS'
-  ) {
-    return getTokenValueByIdAsync((theVarValue as VariableAlias).id)
+function processAliasName(tokenValue: string, exportFormat: ExportFormat): string {
+  switch (exportFormat) {
+    case 'w3c':
+      return convertToCSSVariableName(tokenValue);
+    case 'dotNotation':
+      return convertToDotNotation(tokenValue);
+    case 'camelCase':
+      return convertToCamelCase(tokenValue);
+    case 'cssVar':
+    default:
+      return `var(${convertToCSSVariableName(tokenValue)})`;
   }
-  return theVarValue
+}
+
+// ==============================================
+// Helper Functions
+// ==============================================
+
+function isAliasName(value: any): value is string {
+  return typeof value === 'string' && value.includes('/');
+}
+
+function isColorObject(value: any): value is { r: number; g: number; b: number; a: number } {
+  return typeof value === 'object' && 'r' in value && 'g' in value && 'b' in value && 'a' in value;
+}
+
+function isVisibilityToken(tokenName: string): boolean {
+  const visibilityKeywords = ['visible', 'visibility', 'show'];
+  return visibilityKeywords.some(keyword => tokenName.toLowerCase().includes(keyword));
+}
+
+function isTextDecorationToken(tokenName: string): boolean {
+  const textDecorationKeywords = ['underline', 'text-decoration'];
+  return textDecorationKeywords.some(keyword => tokenName.toLowerCase().includes(keyword));
+}
+
+function getTextDecorationValue(tokenName: string): string {
+  if (tokenName.toLowerCase().includes('solid')) return 'solid';
+  if (tokenName.toLowerCase().includes('dashed')) return 'dashed';
+  return 'underline';
+}
+
+function isVariableAlias(value: any): value is VariableAlias {
+  return typeof value === 'object' && value.type === 'VARIABLE_ALIAS';
+}
+
+async function getTokenValueByIdAsync(varId: string): Promise<any> {
+  const variable = await figma.variables.getVariableByIdAsync(varId);
+  if (!variable) return undefined;
+
+  const collection = await figma.variables.getVariableCollectionByIdAsync(variable.variableCollectionId);
+  if (!collection) return undefined;
+
+  const value = variable.valuesByMode[collection.defaultModeId];
+
+  if (isVariableAlias(value)) {
+    return getTokenValueByIdAsync(value.id);
+  }
+
+  return value;
 }
