@@ -20,7 +20,8 @@
   },
   "figma-plugin": {
     "editorType": [
-      "figma"
+      "figma",
+      "dev"
     ],
     "id": "1332869916969321981",
     "name": "Fluent Tokens Exporter",
