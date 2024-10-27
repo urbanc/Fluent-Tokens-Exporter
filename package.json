@@ -19,6 +19,9 @@
     "prettier": "prettier --write ."
   },
   "figma-plugin": {
+    "capabilities": [
+      "inspect"
+    ],
     "editorType": [
       "figma",
       "dev"
